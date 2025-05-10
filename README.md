@@ -102,9 +102,9 @@ Before running the full AI Scientist-v2 experiment pipeline, you first use the `
 
     ```bash
     python ai_scientist/perform_ideation_temp_free.py \
-     --workshop-file "ai_scientist/ideas/my_research_topic.md" \
-     --model gpt-4o-2024-05-13 \
-     --max-num-generations 20 \
+     --workshop-file "ai_scientist/ideas/iclr2025_bi_align.md" \
+     --model o4-mini-2025-04-16 \
+     --max-num-generations 1 \
      --num-reflections 5
     ```
     *   `--workshop-file`: Path to your topic description Markdown file.
@@ -140,13 +140,12 @@ Example command to run AI-Scientist-v2 using a generated idea file (e.g., `my_re
 
 ```bash
 python launch_scientist_bfts.py \
- --load_ideas "ai_scientist/ideas/my_research_topic.json" \
- --load_code \
+ --load_ideas "ai_scientist/ideas/iclr2025_bi_align.json" \
  --add_dataset_ref \
- --model_writeup o1-preview-2024-09-12 \
- --model_citation gpt-4o-2024-11-20 \
- --model_review gpt-4o-2024-11-20 \
- --model_agg_plots o3-mini-2025-01-31 \
+ --model_writeup o4-mini-2025-04-16 \
+ --model_citation gpt-4o-search-preview-2025-03-11 \
+ --model_review claude-3-7-sonnet-20250219 \
+ --model_agg_plots o4-mini-2025-04-16 \
  --num_cite_rounds 20
 ```
 
