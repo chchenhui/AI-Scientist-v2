@@ -85,19 +85,19 @@ def parse_arguments():
     parser.add_argument(
         "--model_agg_plots",
         type=str,
-        default="o3-mini-2025-01-31",
+        default="o4-mini-2025-04-16",
         help="Model to use for plot aggregation",
     )
     parser.add_argument(
         "--model_writeup",
         type=str,
-        default="o1-preview-2024-09-12",
+        default="o4-mini-2025-04-16",
         help="Model to use for writeup",
     )
     parser.add_argument(
         "--model_citation",
         type=str,
-        default="gpt-4o-2024-11-20",
+        default="gpt-4o-search-preview-2025-03-11",
         help="Model to use for citation gathering",
     )
     parser.add_argument(
@@ -109,7 +109,7 @@ def parse_arguments():
     parser.add_argument(
         "--model_review",
         type=str,
-        default="gpt-4o-2024-11-20",
+        default="o4-mini-2025-04-16",
         help="Model to use for review main text and captions",
     )
     parser.add_argument(
@@ -275,6 +275,7 @@ if __name__ == "__main__":
                 writeup_success = perform_writeup(
                     base_folder=idea_dir,
                     big_model=args.model_writeup,
+                    small_model=args.model_writeup,
                     page_limit=8,
                     citations_text=citations_text,
                 )
@@ -282,6 +283,7 @@ if __name__ == "__main__":
                 writeup_success = perform_icbinb_writeup(
                     base_folder=idea_dir,
                     big_model=args.model_writeup,
+                    small_model=args.model_writeup,
                     page_limit=4,
                     citations_text=citations_text,
                 )
