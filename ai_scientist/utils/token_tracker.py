@@ -57,6 +57,11 @@ class TokenTracker:
                 "cached": 0.55 / 1000000,  # $0.55 per 1M tokens
                 "completion": 4.4 / 1000000,  # $4.40 per 1M tokens
             },
+            "o4-mini-2025-04-16": {
+                "prompt": 1.1 / 1000000,  # $1.10 per 1M tokens
+                "cached": 0.55 / 1000000,  # $0.55 per 1M tokens
+                "completion": 4.4 / 1000000,  # $4.40 per 1M tokens
+            },
         }
 
     def add_tokens(

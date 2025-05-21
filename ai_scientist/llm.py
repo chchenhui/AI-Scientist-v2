@@ -146,7 +146,7 @@ def get_batch_responses_from_llm(
 
 @track_token_usage
 def make_llm_call(client, model, temperature, system_message, prompt):
-    if "gpt" in model or "claude" in model or "gemini" in model:
+    if "gpt" in model or "claude" in model:
         return client.chat.completions.create(
             model=model,
             messages=[
