@@ -183,7 +183,7 @@ review_iclr_bench/generated_paper/
 review_iclr_bench/iclr_parsed/
 
 # Experiment logs
-experiments/
+# experiments/
 aisci_outputs/
 slurm_logs/
 .out

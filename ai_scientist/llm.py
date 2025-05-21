@@ -18,7 +18,7 @@ AVAILABLE_LLMS = [
     "o4-mini-2025-04-16",
     # DeepSeek Models
     # Google Gemini models
-    "gemini-2.5-pro-preview",
+    "google/gemini-2.5-pro-preview",
 ]
 
 
@@ -386,14 +386,6 @@ def create_client(model) -> tuple[Any, str]:
     if model.startswith("claude-"):
         print(f"Using Anthropic API with model {model}.")
         return anthropic.Anthropic(), model
-    # elif model.startswith("bedrock") and "claude" in model:
-    #     client_model = model.split("/")[-1]
-    #     print(f"Using Amazon Bedrock with model {client_model}.")
-    #     return anthropic.AnthropicBedrock(), client_model
-    # elif model.startswith("vertex_ai") and "claude" in model:
-    #     client_model = model.split("/")[-1]
-    #     print(f"Using Vertex AI with model {client_model}.")
-    #     return anthropic.AnthropicVertex(), client_model
     elif "gpt" in model:
         print(f"Using OpenAI API with model {model}.")
         return openai.OpenAI(), model
@@ -431,11 +423,11 @@ def create_client(model) -> tuple[Any, str]:
             "meta-llama/llama-3.1-405b-instruct",
         )
     elif 'gemini' in model:
-        print(f"Using OpenAI API with {model}.")
+        print(f"Using OpenRouter API with {model}.")
         return (
             openai.OpenAI(
-                api_key=os.environ["GEMINI_API_KEY"],
-                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+                api_key=os.environ["OPENROUTER_API_KEY"],
+                base_url="https://openrouter.ai/api/v1",
             ),
             model,
         )

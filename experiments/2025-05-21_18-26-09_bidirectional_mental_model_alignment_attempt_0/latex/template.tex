@@ -1,0 +1,130 @@
+\documentclass{article}
+\usepackage{iclr2025,times}
+
+% Optional math commands
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage[capitalize,noabbrev]{cleveref}
+
+\graphicspath{{../figures/}}
+
+\begin{filecontents}{references.bib}
+@book{goodfellow2016deep,
+  title={Deep learning}, author={Goodfellow, Ian and Bengio, Yoshua and Courville, Aaron},
+  volume={1}, year={2016}, publisher={MIT Press}
+}
+@article{miller2017explanationia,
+  author={Tim Miller}, title={Explanation in Artificial Intelligence: Insights from the Social Sciences},
+  journal={ArXiv}, volume={abs/1706.07269}, year={2017}
+}
+@book{kulesza2015principlesoe,
+  author={Todd Kulesza and M. Burnett and Weng-Keen Wong and S. Stumpf},
+  title={Principles of Explanatory Debugging to Personalize Interactive Machine Learning},
+  booktitle={Proceedings of the 20th International Conference on Intelligent User Interfaces},
+  year={2015}
+}
+@article{hadfield-menell2016cooperativeir,
+  author={Dylan Hadfield-Menell and Stuart J. Russell and Pieter Abbeel and Anca Dragan},
+  title={Cooperative Inverse Reinforcement Learning},
+  booktitle={Neural Information Processing Systems}, pages={3909--3917}, year={2016}
+}
+@article{lin1991divergencemb,
+  author={Jianhua Lin}, title={Divergence measures based on the Shannon entropy},
+  journal={IEEE Trans. Inf. Theory}, volume={37}, pages={145--151}, year={1991}
+}
+@article{lee2004trustia,
+  author={John D. Lee and Katrina A. See}, title={Trust in Automation: Designing for Appropriate Reliance},
+  journal={Human Factors}, volume={46}, pages={50--80}, year={2004}
+}
+@book{ribeiro2016whysi,
+  author={Marco Tulio Ribeiro and Sameer Singh and Carlos Guestrin},
+  title={"Why Should I Trust You?": Explaining the Predictions of Any Classifier},
+  booktitle={Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining}, year={2016}
+}
+@article{kingma2014adamam,
+  author={Diederik P. Kingma and Jimmy Ba},
+  title={Adam: A Method for Stochastic Optimization}, journal={ArXiv},
+  volume={abs/1412.6980}, year={2014}
+}
+\end{filecontents}
+
+\title{Aligning Minds: Pitfalls in Proxy‐Based Mental Model Alignment for Human–AI Collaboration}
+\author{Anonymous}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+As AI systems become integral partners in decision‐making, mismatches between a user's mental model of the AI and the AI's model of the user can degrade performance, trust, and safety. We introduce Co-Adaptive Mental Model Alignment (CAMMA), a closed-loop framework that jointly infers the user's beliefs and the AI's estimate of the user's goals in real time, then adapts explanations and solicits feedback to minimize their divergence. Synthetic pilot studies (see App.~\ref{app:synthetic}) show standard alignment metrics saturate near perfection, obscuring differences. We then report a dropout ablation on Dbpedia 14 revealing minor alignment spreads despite large loss changes. We discuss the limitations of proxy‐based metrics, propose refined measures, and plan real‐user trials.
+\end{abstract}
+
+\section{Introduction}
+Effective human–AI collaboration requires mutual understanding: users must form accurate mental models of AI behavior, and AI systems should accurately infer user goals. One‐way adaptation—either tailoring explanations to a fixed user model or adjusting behavior based on user feedback—addresses only half the problem. We propose CAMMA, a bidirectional loop that alternates between inferring the user's model of the AI and updating the AI's model of the user, guided by an alignment score. Our contributions are: (i) the Mutual Model Alignment Score (MMAS) based on Jensen–Shannon divergence; (ii) synthetic pilots (App.~\ref{app:synthetic}) revealing MMAS saturation; (iii) a Dbpedia 14 dropout ablation (Fig.~\ref{fig:dropout_main}) showing minor alignment shifts despite large loss gaps; (iv) a discussion of proxy‐metric pitfalls and a roadmap for human–AI validation.
+
+\section{Related Work}
+User mental models of AI have been studied in HCI and ML. Miller provides social‐science insights into explanation needs~\citep{miller2017explanationia}. Kulesza \emph{et al.} develop explanatory debugging to correct AI misconceptions interactively~\citep{kulesza2015principlesoe}. Cooperative IRL frames value alignment as inferring human rewards~\citep{hadfield-menell2016cooperativeir}. Plan reconciliation methods adjust explanations to satisfy a user's model~\citep{ribeiro2016whysi}. Information‐theoretic divergences assess alignment~\citep{lin1991divergencemb}. Trust calibration in automation emphasizes appropriate reliance~\citep{lee2004trustia}. Unlike prior one‐way adaptation, CAMMA co‐updates both models iteratively.
+
+\section{Method: CAMMA}
+Let $P(u\!\mid x)$ be the AI's model of the user's belief over labels, and $Q(u\!\mid x)$ the user's belief about the AI. Define
+\[
+\mathrm{JSD}(P,Q)=\tfrac12\mathrm{KL}(P\Vert M)+\tfrac12\mathrm{KL}(Q\Vert M),
+\quad M=\tfrac12(P+Q),
+\quad
+\mathrm{MMAS}=1-\mathrm{JSD}(P,Q)\in[0,1].
+\]
+CAMMA operates in a continuous loop: 
+(i) infer $Q(u\!\mid x)$ from user responses; 
+(ii) update $P(u\!\mid x)$ via inverse‐IRL~\citep{hadfield-menell2016cooperativeir}; 
+(iii) compute MMAS to trigger adapted explanations or feedback requests. Intervention policies trade off alignment gains against interaction cost.
+
+\section{Experiments}
+We first ran synthetic MLP classification pilots (App.~\ref{app:synthetic}) to test learning‐rate effects on MMAS. Next, we performed a dropout ablation on Dbpedia 14 with a 2‐layer MLP (32 ReLU units, softmax), Adam~\citep{kingma2014adamam}, learning rate 1e-3, dropout \{0.0,0.1,0.3,0.5\}, for three epochs. We logged validation loss and MMAS.
+
+\section{Results}
+Synthetic pilots show MMAS >0.99 within three epochs for all rates (App.~\ref{app:synthetic}), with only 0.005 difference—saturation that hides systematic gaps. Figure~\ref{fig:dropout_main} gives the Dbpedia 14 ablation. Validation loss increases with dropout, while MMAS rises to ~0.995 by epoch 2 and then plateaus: only ±0.002 spread across dropout rates despite >0.5 loss variation. This underscores the limitations of symmetric‐divergence metrics. The Model Alignment Improvement (MAI, App.~\ref{app:maisecond}) similarly shows marginal gains, reinforcing this pitfall.
+
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{0.48\linewidth}
+    \includegraphics[width=\linewidth]{fig2_mlp_dropout_dbpedia14.png}
+    \caption{Validation Loss vs.\ Epoch}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\linewidth}
+    \includegraphics[width=\linewidth]{app_alignment_dbpedia14_two_panel.png}
+    \caption{Validation MMAS vs.\ Epoch}
+  \end{subfigure}
+  \caption{Dbpedia 14 dropout ablation: (a) higher dropout increases loss; (b) MMAS saturates by epoch 2 with only ±0.002 spread.}
+  \label{fig:dropout_main}
+\end{figure}
+
+\section{Conclusion}
+We introduced CAMMA, a co‐adaptive framework for mental model alignment, and conducted proxy‐based pilots. MMAS saturation in both learning‐rate and dropout ablations highlights that symmetric divergences on identical‐architecture proxies can mask meaningful misalignment. Future work will validate CAMMA with human subjects, develop asymmetric or behavior‐driven metrics, and design probing policies to uncover subtle divergences while balancing cost.
+
+\bibliography{references}
+\bibliographystyle{iclr2025}
+
+\appendix
+\section{Synthetic Learning‐Rate Sweep}
+\label{app:synthetic}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.85\linewidth]{app_synth_lr_sweep.png}
+  \caption{Synthetic 2×2 sweep: top row loss (solid=train, dashed=val); bottom row MMAS. MMAS saturates >0.99 by epoch 3.}
+  \label{fig:synthetic}
+\end{figure}
+
+\section{Additional MAI Curve}
+\label{app:maisecond}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.6\linewidth]{app_mai_dbpedia14.png}
+  \caption{Model Alignment Improvement for Dbpedia 14 dropout: sharp rise epoch 1→2, then plateau.}
+\end{figure}
+
+\end{document}

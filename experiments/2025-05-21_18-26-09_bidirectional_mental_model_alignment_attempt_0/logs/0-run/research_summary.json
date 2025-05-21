@@ -1,0 +1,691 @@
+{
+  "best node": {
+    "overall_plan": "Hyperparam tuning name: learning_rate.\nI\u2019ll sweep the Adam initial learning rate over a log\u2010uniform grid [1e-4, 5e-4, 1e-3, 5e-3, 1e-2], re\u2010initializing models at each setting for a fair comparison. For each learning rate I train both AI and user MLPs jointly over a fixed number of epochs, recording training/validation losses and alignments per epoch, and finally collecting validation predictions and ground truth. All plottable data (metrics, losses, predictions, ground truth) are organized under `experiment_data['learning_rate']['synthetic']` and saved via `np.save(..., 'experiment_data.npy')`.",
+    "analysis": "The code ran successfully with no runtime errors. Training and validation losses decreased as expected across epochs, and alignment scores behaved reasonably, peaking around learning rates 5e-3 and 1e-2. No bugs were detected.",
+    "metric": {
+      "value": {
+        "metric_names": [
+          {
+            "metric_name": "training alignment",
+            "lower_is_better": false,
+            "description": "Final alignment on the training set",
+            "data": [
+              {
+                "dataset_name": "learning rate 1.0e-04",
+                "final_value": 0.9929,
+                "best_value": 0.9929
+              },
+              {
+                "dataset_name": "learning rate 5.0e-04",
+                "final_value": 0.9921,
+                "best_value": 0.9921
+              },
+              {
+                "dataset_name": "learning rate 1.0e-03",
+                "final_value": 0.9917,
+                "best_value": 0.9917
+              },
+              {
+                "dataset_name": "learning rate 5.0e-03",
+                "final_value": 0.9988,
+                "best_value": 0.9988
+              },
+              {
+                "dataset_name": "learning rate 1.0e-02",
+                "final_value": 0.9991,
+                "best_value": 0.9991
+              }
+            ]
+          },
+          {
+            "metric_name": "validation alignment",
+            "lower_is_better": false,
+            "description": "Final alignment on the validation set",
+            "data": [
+              {
+                "dataset_name": "learning rate 1.0e-04",
+                "final_value": 0.9929,
+                "best_value": 0.9929
+              },
+              {
+                "dataset_name": "learning rate 5.0e-04",
+                "final_value": 0.9915,
+                "best_value": 0.9915
+              },
+              {
+                "dataset_name": "learning rate 1.0e-03",
+                "final_value": 0.9907,
+                "best_value": 0.9907
+              },
+              {
+                "dataset_name": "learning rate 5.0e-03",
+                "final_value": 0.9989,
+                "best_value": 0.9989
+              },
+              {
+                "dataset_name": "learning rate 1.0e-02",
+                "final_value": 0.9986,
+                "best_value": 0.9986
+              }
+            ]
+          },
+          {
+            "metric_name": "training loss",
+            "lower_is_better": true,
+            "description": "Final loss on the training set",
+            "data": [
+              {
+                "dataset_name": "learning rate 1.0e-04",
+                "final_value": 1.0162,
+                "best_value": 1.0162
+              },
+              {
+                "dataset_name": "learning rate 5.0e-04",
+                "final_value": 0.7943,
+                "best_value": 0.7943
+              },
+              {
+                "dataset_name": "learning rate 1.0e-03",
+                "final_value": 0.5274,
+                "best_value": 0.5274
+              },
+              {
+                "dataset_name": "learning rate 5.0e-03",
+                "final_value": 0.0982,
+                "best_value": 0.0982
+              },
+              {
+                "dataset_name": "learning rate 1.0e-02",
+                "final_value": 0.0588,
+                "best_value": 0.0588
+              }
+            ]
+          },
+          {
+            "metric_name": "validation loss",
+            "lower_is_better": true,
+            "description": "Final loss on the validation set",
+            "data": [
+              {
+                "dataset_name": "learning rate 1.0e-04",
+                "final_value": 1.0106,
+                "best_value": 1.0106
+              },
+              {
+                "dataset_name": "learning rate 5.0e-04",
+                "final_value": 0.7817,
+                "best_value": 0.7817
+              },
+              {
+                "dataset_name": "learning rate 1.0e-03",
+                "final_value": 0.5101,
+                "best_value": 0.5101
+              },
+              {
+                "dataset_name": "learning rate 5.0e-03",
+                "final_value": 0.1039,
+                "best_value": 0.1039
+              },
+              {
+                "dataset_name": "learning rate 1.0e-02",
+                "final_value": 0.0739,
+                "best_value": 0.0739
+              }
+            ]
+          },
+          {
+            "metric_name": "test accuracy",
+            "lower_is_better": false,
+            "description": "Accuracy on the test set",
+            "data": [
+              {
+                "dataset_name": "learning rate 1.0e-04",
+                "final_value": 0.6,
+                "best_value": 0.6
+              },
+              {
+                "dataset_name": "learning rate 5.0e-04",
+                "final_value": 0.835,
+                "best_value": 0.835
+              },
+              {
+                "dataset_name": "learning rate 1.0e-03",
+                "final_value": 0.905,
+                "best_value": 0.905
+              },
+              {
+                "dataset_name": "learning rate 5.0e-03",
+                "final_value": 0.96,
+                "best_value": 0.96
+              },
+              {
+                "dataset_name": "learning rate 1.0e-02",
+                "final_value": 0.965,
+                "best_value": 0.965
+              }
+            ]
+          }
+        ]
+      },
+      "maximize": null,
+      "name": null,
+      "description": null
+    },
+    "code": "import os\nimport numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nfrom torch.utils.data import DataLoader, TensorDataset\n\n# Setup working directory\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n# Device\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Reproducibility\ntorch.manual_seed(0)\nnp.random.seed(0)\n\n# Synthetic data generation\nN_train, N_val, D, C = 1000, 200, 10, 3\nW_true = np.random.randn(D, C)\nx_train = np.random.randn(N_train, D)\nx_val = np.random.randn(N_val, D)\ny_train = np.argmax(x_train @ W_true + 0.1 * np.random.randn(N_train, C), axis=1)\ny_val = np.argmax(x_val @ W_true + 0.1 * np.random.randn(N_val, C), axis=1)\nmean = x_train.mean(axis=0)\nstd = x_train.std(axis=0) + 1e-8\nx_train = (x_train - mean) / std\nx_val = (x_val - mean) / std\n\n# DataLoaders\ntrain_dataset = TensorDataset(\n    torch.tensor(x_train, dtype=torch.float32),\n    torch.tensor(y_train, dtype=torch.long),\n)\nval_dataset = TensorDataset(\n    torch.tensor(x_val, dtype=torch.float32),\n    torch.tensor(y_val, dtype=torch.long),\n)\ntrain_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)\nval_loader = DataLoader(val_dataset, batch_size=64)\n\n\n# Simple MLP definition\nclass MLP(nn.Module):\n    def __init__(self, in_dim, hid_dim, out_dim):\n        super().__init__()\n        self.fc1 = nn.Linear(in_dim, hid_dim)\n        self.fc2 = nn.Linear(hid_dim, out_dim)\n\n    def forward(self, x):\n        x = F.relu(self.fc1(x))\n        return self.fc2(x)\n\n\n# Hyperparameter sweep over learning rates\nlearning_rates = [1e-4, 5e-4, 1e-3, 5e-3, 1e-2]\nnum_epochs = 10\n\n# Initialize experiment_data dict\nexperiment_data = {\n    \"learning_rate\": {\n        \"synthetic\": {\n            \"lrs\": learning_rates,\n            \"metrics\": {\"train\": [], \"val\": []},\n            \"losses\": {\"train\": [], \"val\": []},\n            \"predictions\": [],\n            \"ground_truth\": [],\n        }\n    }\n}\n\nloss_fn = nn.CrossEntropyLoss()\n\nfor lr in learning_rates:\n    # Reset model weights for fair comparison\n    torch.manual_seed(0)\n    ai_model = MLP(D, 32, C).to(device)\n    user_model = MLP(D, 32, C).to(device)\n    optimizer_ai = torch.optim.Adam(ai_model.parameters(), lr=lr)\n    optimizer_user = torch.optim.Adam(user_model.parameters(), lr=lr)\n\n    # Containers for this learning rate\n    train_losses, val_losses = [], []\n    train_aligns, val_aligns = [], []\n\n    for epoch in range(1, num_epochs + 1):\n        # Training\n        ai_model.train()\n        user_model.train()\n        total_loss, total_align, n_samples = 0.0, 0.0, 0\n        for xb, yb in train_loader:\n            xb, yb = xb.to(device), yb.to(device)\n            # Forward passes\n            logits_ai = ai_model(xb)\n            logits_user = user_model(xb)\n            # Cross-entropy losses\n            loss_ai = loss_fn(logits_ai, yb)\n            loss_user = loss_fn(logits_user, yb)\n            # Backprop AI\n            optimizer_ai.zero_grad()\n            loss_ai.backward()\n            optimizer_ai.step()\n            # Backprop user\n            optimizer_user.zero_grad()\n            loss_user.backward()\n            optimizer_user.step()\n            # Accumulate loss\n            bs = yb.size(0)\n            total_loss += loss_ai.item() * bs\n            # Alignment (1 - JSD)\n            P = F.softmax(logits_ai, dim=1)\n            Q = F.softmax(logits_user, dim=1)\n            M = 0.5 * (P + Q)\n            kl1 = torch.sum(P * (torch.log(P + 1e-8) - torch.log(M + 1e-8)), dim=1)\n            kl2 = torch.sum(Q * (torch.log(Q + 1e-8) - torch.log(M + 1e-8)), dim=1)\n            jsd = 0.5 * (kl1 + kl2)\n            total_align += torch.sum(1 - jsd).item()\n            n_samples += bs\n        train_losses.append(total_loss / len(train_dataset))\n        train_aligns.append(total_align / n_samples)\n\n        # Validation\n        ai_model.eval()\n        user_model.eval()\n        v_loss, v_align, v_samples = 0.0, 0.0, 0\n        with torch.no_grad():\n            for xb, yb in val_loader:\n                xb, yb = xb.to(device), yb.to(device)\n                logits_ai = ai_model(xb)\n                # loss\n                v_loss += loss_fn(logits_ai, yb).item() * yb.size(0)\n                # alignment\n                P = F.softmax(logits_ai, dim=1)\n                Q = F.softmax(user_model(xb), dim=1)\n                M = 0.5 * (P + Q)\n                kl1 = torch.sum(P * (torch.log(P + 1e-8) - torch.log(M + 1e-8)), dim=1)\n                kl2 = torch.sum(Q * (torch.log(Q + 1e-8) - torch.log(M + 1e-8)), dim=1)\n                jsd = 0.5 * (kl1 + kl2)\n                v_align += torch.sum(1 - jsd).item()\n                v_samples += yb.size(0)\n        val_losses.append(v_loss / len(val_dataset))\n        val_aligns.append(v_align / v_samples)\n        print(\n            f\"LR {lr:.1e} Epoch {epoch}: val_loss = {val_losses[-1]:.4f}, val_align = {val_aligns[-1]:.4f}\"\n        )\n\n    # Store per\u2010epoch metrics\n    sd = experiment_data[\"learning_rate\"][\"synthetic\"]\n    sd[\"metrics\"][\"train\"].append(train_aligns)\n    sd[\"metrics\"][\"val\"].append(val_aligns)\n    sd[\"losses\"][\"train\"].append(train_losses)\n    sd[\"losses\"][\"val\"].append(val_losses)\n\n    # Final validation predictions & ground truth\n    all_preds, all_gts = [], []\n    ai_model.eval()\n    with torch.no_grad():\n        for xb, yb in val_loader:\n            xb = xb.to(device)\n            preds = torch.argmax(ai_model(xb), dim=1).cpu().numpy()\n            all_preds.append(preds)\n            all_gts.append(yb.numpy())\n    preds_arr = np.concatenate(all_preds, axis=0)\n    gts_arr = np.concatenate(all_gts, axis=0)\n    sd[\"predictions\"].append(preds_arr)\n    sd[\"ground_truth\"].append(gts_arr)\n\n# Save all experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n",
+    "plot_code": "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\n# Load experiment data\ntry:\n    data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    data = {}\n\nsd = data.get(\"learning_rate\", {}).get(\"synthetic\", {})\n\n# Plot 1: Loss curves\ntry:\n    lrs = sd.get(\"lrs\", [])\n    train_losses = sd.get(\"losses\", {}).get(\"train\", [])\n    val_losses = sd.get(\"losses\", {}).get(\"val\", [])\n    epochs = range(1, len(train_losses[0]) + 1)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    for lr, tr in zip(lrs, train_losses):\n        axes[0].plot(epochs, tr, label=f\"lr={lr}\")\n    axes[0].set_title(\"Training Loss\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Loss\")\n    axes[0].legend()\n    for lr, vl in zip(lrs, val_losses):\n        axes[1].plot(epochs, vl, label=f\"lr={lr}\")\n    axes[1].set_title(\"Validation Loss\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Loss\")\n    axes[1].legend()\n    fig.suptitle(\n        \"Synthetic Dataset - Loss Curves\\nLeft: Training Loss, Right: Validation Loss\"\n    )\n    plt.savefig(os.path.join(working_dir, \"synthetic_loss_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot1: {e}\")\n    plt.close()\n\n# Plot 2: Alignment curves\ntry:\n    train_align = sd.get(\"metrics\", {}).get(\"train\", [])\n    val_align = sd.get(\"metrics\", {}).get(\"val\", [])\n    epochs = range(1, len(train_align[0]) + 1)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    for lr, ta in zip(lrs, train_align):\n        axes[0].plot(epochs, ta, label=f\"lr={lr}\")\n    axes[0].set_title(\"Training Alignment\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Alignment (1-JSD)\")\n    axes[0].legend()\n    for lr, va in zip(lrs, val_align):\n        axes[1].plot(epochs, va, label=f\"lr={lr}\")\n    axes[1].set_title(\"Validation Alignment\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Alignment (1-JSD)\")\n    axes[1].legend()\n    fig.suptitle(\n        \"Synthetic Dataset - Alignment Curves\\nLeft: Training Alignment, Right: Validation Alignment\"\n    )\n    plt.savefig(os.path.join(working_dir, \"synthetic_alignment_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot2: {e}\")\n    plt.close()\n",
+    "plot_plan": "First, load the experiment data and extract the synthetic results under the learning rate sweep. Then use two separate try-except blocks to create and save figures: one for the training/validation loss curves and another for the training/validation alignment curves. Each figure will have two subplots\u2014left for training metrics and right for validation\u2014with clear titles, axis labels, legends for each learning rate, and a suptitle specifying \u201cSynthetic Dataset\u201d and the left/right designations. We iterate over the stored learning rates to plot each curve, save the figures to `working_dir` with descriptive filenames, and close them. If any error occurs in plotting or data loading, we print an error message and ensure the figure is closed.",
+    "plot_analyses": [],
+    "plot_paths": [
+      "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_7d04e00cb67f4c5b995391df64eb1749_proc_4007053/synthetic_loss_curves.png",
+      "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_7d04e00cb67f4c5b995391df64eb1749_proc_4007053/synthetic_alignment_curves.png"
+    ],
+    "vlm_feedback_summary": [],
+    "exp_results_dir": "experiment_results/experiment_7d04e00cb67f4c5b995391df64eb1749_proc_4007053",
+    "exp_results_npy_files": [
+      "experiment_results/experiment_7d04e00cb67f4c5b995391df64eb1749_proc_4007053/experiment_data.npy"
+    ]
+  },
+  "best node with different seeds": [
+    {
+      "overall_plan": "Conduct a systematic log\u2010uniform sweep of the Adam optimizer\u2019s initial learning rate over [1e-4, 5e-4, 1e-3, 5e-3, 1e-2], re\u2010initializing both AI and user MLP models at each rate to ensure fair comparison. For each learning rate setting, fix random seeds at the start to guarantee reproducibility across initializations, data shuffling, and stochastic operations. Train both models jointly over a predetermined number of epochs, record per\u2010epoch training and validation losses, alignment metrics, and finally collect validation predictions alongside ground truth. Organize all collected data under a structured dictionary (e.g., experiment_data['learning_rate']['synthetic']) and save using NumPy for subsequent analysis.",
+      "analysis": "",
+      "metric": {
+        "value": {
+          "metric_names": [
+            {
+              "metric_name": "training alignment",
+              "lower_is_better": false,
+              "description": "Alignment score on the training dataset",
+              "data": [
+                {
+                  "dataset_name": "synthetic (lr=1.0e-04)",
+                  "final_value": 0.9929,
+                  "best_value": 0.9929
+                },
+                {
+                  "dataset_name": "synthetic (lr=5.0e-04)",
+                  "final_value": 0.9921,
+                  "best_value": 0.9921
+                },
+                {
+                  "dataset_name": "synthetic (lr=1.0e-03)",
+                  "final_value": 0.9917,
+                  "best_value": 0.9917
+                },
+                {
+                  "dataset_name": "synthetic (lr=5.0e-03)",
+                  "final_value": 0.9988,
+                  "best_value": 0.9988
+                },
+                {
+                  "dataset_name": "synthetic (lr=1.0e-02)",
+                  "final_value": 0.9991,
+                  "best_value": 0.9991
+                }
+              ]
+            },
+            {
+              "metric_name": "validation alignment",
+              "lower_is_better": false,
+              "description": "Alignment score on the validation dataset",
+              "data": [
+                {
+                  "dataset_name": "synthetic (lr=1.0e-04)",
+                  "final_value": 0.9929,
+                  "best_value": 0.9929
+                },
+                {
+                  "dataset_name": "synthetic (lr=5.0e-04)",
+                  "final_value": 0.9915,
+                  "best_value": 0.9915
+                },
+                {
+                  "dataset_name": "synthetic (lr=1.0e-03)",
+                  "final_value": 0.9907,
+                  "best_value": 0.9907
+                },
+                {
+                  "dataset_name": "synthetic (lr=5.0e-03)",
+                  "final_value": 0.9989,
+                  "best_value": 0.9989
+                },
+                {
+                  "dataset_name": "synthetic (lr=1.0e-02)",
+                  "final_value": 0.9986,
+                  "best_value": 0.9986
+                }
+              ]
+            },
+            {
+              "metric_name": "training loss",
+              "lower_is_better": true,
+              "description": "Loss on the training dataset",
+              "data": [
+                {
+                  "dataset_name": "synthetic (lr=1.0e-04)",
+                  "final_value": 1.0162,
+                  "best_value": 1.0162
+                },
+                {
+                  "dataset_name": "synthetic (lr=5.0e-04)",
+                  "final_value": 0.7943,
+                  "best_value": 0.7943
+                },
+                {
+                  "dataset_name": "synthetic (lr=1.0e-03)",
+                  "final_value": 0.5274,
+                  "best_value": 0.5274
+                },
+                {
+                  "dataset_name": "synthetic (lr=5.0e-03)",
+                  "final_value": 0.0982,
+                  "best_value": 0.0982
+                },
+                {
+                  "dataset_name": "synthetic (lr=1.0e-02)",
+                  "final_value": 0.0588,
+                  "best_value": 0.0588
+                }
+              ]
+            },
+            {
+              "metric_name": "validation loss",
+              "lower_is_better": true,
+              "description": "Loss on the validation dataset",
+              "data": [
+                {
+                  "dataset_name": "synthetic (lr=1.0e-04)",
+                  "final_value": 1.0106,
+                  "best_value": 1.0106
+                },
+                {
+                  "dataset_name": "synthetic (lr=5.0e-04)",
+                  "final_value": 0.7817,
+                  "best_value": 0.7817
+                },
+                {
+                  "dataset_name": "synthetic (lr=1.0e-03)",
+                  "final_value": 0.5101,
+                  "best_value": 0.5101
+                },
+                {
+                  "dataset_name": "synthetic (lr=5.0e-03)",
+                  "final_value": 0.1039,
+                  "best_value": 0.1039
+                },
+                {
+                  "dataset_name": "synthetic (lr=1.0e-02)",
+                  "final_value": 0.0739,
+                  "best_value": 0.0739
+                }
+              ]
+            },
+            {
+              "metric_name": "test accuracy",
+              "lower_is_better": false,
+              "description": "Accuracy on the test dataset",
+              "data": [
+                {
+                  "dataset_name": "synthetic (lr=1.0e-04)",
+                  "final_value": 0.6,
+                  "best_value": 0.6
+                },
+                {
+                  "dataset_name": "synthetic (lr=5.0e-04)",
+                  "final_value": 0.835,
+                  "best_value": 0.835
+                },
+                {
+                  "dataset_name": "synthetic (lr=1.0e-03)",
+                  "final_value": 0.905,
+                  "best_value": 0.905
+                },
+                {
+                  "dataset_name": "synthetic (lr=5.0e-03)",
+                  "final_value": 0.96,
+                  "best_value": 0.96
+                },
+                {
+                  "dataset_name": "synthetic (lr=1.0e-02)",
+                  "final_value": 0.965,
+                  "best_value": 0.965
+                }
+              ]
+            }
+          ]
+        },
+        "maximize": null,
+        "name": null,
+        "description": null
+      },
+      "code": "# Set random seed\nimport random\nimport numpy as np\nimport torch\n\nseed = 0\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\nimport os\nimport numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nfrom torch.utils.data import DataLoader, TensorDataset\n\n# Setup working directory\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n# Device\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Reproducibility\ntorch.manual_seed(0)\nnp.random.seed(0)\n\n# Synthetic data generation\nN_train, N_val, D, C = 1000, 200, 10, 3\nW_true = np.random.randn(D, C)\nx_train = np.random.randn(N_train, D)\nx_val = np.random.randn(N_val, D)\ny_train = np.argmax(x_train @ W_true + 0.1 * np.random.randn(N_train, C), axis=1)\ny_val = np.argmax(x_val @ W_true + 0.1 * np.random.randn(N_val, C), axis=1)\nmean = x_train.mean(axis=0)\nstd = x_train.std(axis=0) + 1e-8\nx_train = (x_train - mean) / std\nx_val = (x_val - mean) / std\n\n# DataLoaders\ntrain_dataset = TensorDataset(\n    torch.tensor(x_train, dtype=torch.float32),\n    torch.tensor(y_train, dtype=torch.long),\n)\nval_dataset = TensorDataset(\n    torch.tensor(x_val, dtype=torch.float32),\n    torch.tensor(y_val, dtype=torch.long),\n)\ntrain_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)\nval_loader = DataLoader(val_dataset, batch_size=64)\n\n\n# Simple MLP definition\nclass MLP(nn.Module):\n    def __init__(self, in_dim, hid_dim, out_dim):\n        super().__init__()\n        self.fc1 = nn.Linear(in_dim, hid_dim)\n        self.fc2 = nn.Linear(hid_dim, out_dim)\n\n    def forward(self, x):\n        x = F.relu(self.fc1(x))\n        return self.fc2(x)\n\n\n# Hyperparameter sweep over learning rates\nlearning_rates = [1e-4, 5e-4, 1e-3, 5e-3, 1e-2]\nnum_epochs = 10\n\n# Initialize experiment_data dict\nexperiment_data = {\n    \"learning_rate\": {\n        \"synthetic\": {\n            \"lrs\": learning_rates,\n            \"metrics\": {\"train\": [], \"val\": []},\n            \"losses\": {\"train\": [], \"val\": []},\n            \"predictions\": [],\n            \"ground_truth\": [],\n        }\n    }\n}\n\nloss_fn = nn.CrossEntropyLoss()\n\nfor lr in learning_rates:\n    # Reset model weights for fair comparison\n    torch.manual_seed(0)\n    ai_model = MLP(D, 32, C).to(device)\n    user_model = MLP(D, 32, C).to(device)\n    optimizer_ai = torch.optim.Adam(ai_model.parameters(), lr=lr)\n    optimizer_user = torch.optim.Adam(user_model.parameters(), lr=lr)\n\n    # Containers for this learning rate\n    train_losses, val_losses = [], []\n    train_aligns, val_aligns = [], []\n\n    for epoch in range(1, num_epochs + 1):\n        # Training\n        ai_model.train()\n        user_model.train()\n        total_loss, total_align, n_samples = 0.0, 0.0, 0\n        for xb, yb in train_loader:\n            xb, yb = xb.to(device), yb.to(device)\n            # Forward passes\n            logits_ai = ai_model(xb)\n            logits_user = user_model(xb)\n            # Cross-entropy losses\n            loss_ai = loss_fn(logits_ai, yb)\n            loss_user = loss_fn(logits_user, yb)\n            # Backprop AI\n            optimizer_ai.zero_grad()\n            loss_ai.backward()\n            optimizer_ai.step()\n            # Backprop user\n            optimizer_user.zero_grad()\n            loss_user.backward()\n            optimizer_user.step()\n            # Accumulate loss\n            bs = yb.size(0)\n            total_loss += loss_ai.item() * bs\n            # Alignment (1 - JSD)\n            P = F.softmax(logits_ai, dim=1)\n            Q = F.softmax(logits_user, dim=1)\n            M = 0.5 * (P + Q)\n            kl1 = torch.sum(P * (torch.log(P + 1e-8) - torch.log(M + 1e-8)), dim=1)\n            kl2 = torch.sum(Q * (torch.log(Q + 1e-8) - torch.log(M + 1e-8)), dim=1)\n            jsd = 0.5 * (kl1 + kl2)\n            total_align += torch.sum(1 - jsd).item()\n            n_samples += bs\n        train_losses.append(total_loss / len(train_dataset))\n        train_aligns.append(total_align / n_samples)\n\n        # Validation\n        ai_model.eval()\n        user_model.eval()\n        v_loss, v_align, v_samples = 0.0, 0.0, 0\n        with torch.no_grad():\n            for xb, yb in val_loader:\n                xb, yb = xb.to(device), yb.to(device)\n                logits_ai = ai_model(xb)\n                # loss\n                v_loss += loss_fn(logits_ai, yb).item() * yb.size(0)\n                # alignment\n                P = F.softmax(logits_ai, dim=1)\n                Q = F.softmax(user_model(xb), dim=1)\n                M = 0.5 * (P + Q)\n                kl1 = torch.sum(P * (torch.log(P + 1e-8) - torch.log(M + 1e-8)), dim=1)\n                kl2 = torch.sum(Q * (torch.log(Q + 1e-8) - torch.log(M + 1e-8)), dim=1)\n                jsd = 0.5 * (kl1 + kl2)\n                v_align += torch.sum(1 - jsd).item()\n                v_samples += yb.size(0)\n        val_losses.append(v_loss / len(val_dataset))\n        val_aligns.append(v_align / v_samples)\n        print(\n            f\"LR {lr:.1e} Epoch {epoch}: val_loss = {val_losses[-1]:.4f}, val_align = {val_aligns[-1]:.4f}\"\n        )\n\n    # Store per\u2010epoch metrics\n    sd = experiment_data[\"learning_rate\"][\"synthetic\"]\n    sd[\"metrics\"][\"train\"].append(train_aligns)\n    sd[\"metrics\"][\"val\"].append(val_aligns)\n    sd[\"losses\"][\"train\"].append(train_losses)\n    sd[\"losses\"][\"val\"].append(val_losses)\n\n    # Final validation predictions & ground truth\n    all_preds, all_gts = [], []\n    ai_model.eval()\n    with torch.no_grad():\n        for xb, yb in val_loader:\n            xb = xb.to(device)\n            preds = torch.argmax(ai_model(xb), dim=1).cpu().numpy()\n            all_preds.append(preds)\n            all_gts.append(yb.numpy())\n    preds_arr = np.concatenate(all_preds, axis=0)\n    gts_arr = np.concatenate(all_gts, axis=0)\n    sd[\"predictions\"].append(preds_arr)\n    sd[\"ground_truth\"].append(gts_arr)\n\n# Save all experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n",
+      "plot_code": "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\n# Load experiment data\ntry:\n    data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    data = {}\n\nsd = data.get(\"learning_rate\", {}).get(\"synthetic\", {})\n\n# Plot 1: Loss curves\ntry:\n    lrs = sd.get(\"lrs\", [])\n    train_losses = sd.get(\"losses\", {}).get(\"train\", [])\n    val_losses = sd.get(\"losses\", {}).get(\"val\", [])\n    epochs = range(1, len(train_losses[0]) + 1)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    for lr, tr in zip(lrs, train_losses):\n        axes[0].plot(epochs, tr, label=f\"lr={lr}\")\n    axes[0].set_title(\"Training Loss\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Loss\")\n    axes[0].legend()\n    for lr, vl in zip(lrs, val_losses):\n        axes[1].plot(epochs, vl, label=f\"lr={lr}\")\n    axes[1].set_title(\"Validation Loss\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Loss\")\n    axes[1].legend()\n    fig.suptitle(\n        \"Synthetic Dataset - Loss Curves\\nLeft: Training Loss, Right: Validation Loss\"\n    )\n    plt.savefig(os.path.join(working_dir, \"synthetic_loss_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot1: {e}\")\n    plt.close()\n\n# Plot 2: Alignment curves\ntry:\n    train_align = sd.get(\"metrics\", {}).get(\"train\", [])\n    val_align = sd.get(\"metrics\", {}).get(\"val\", [])\n    epochs = range(1, len(train_align[0]) + 1)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    for lr, ta in zip(lrs, train_align):\n        axes[0].plot(epochs, ta, label=f\"lr={lr}\")\n    axes[0].set_title(\"Training Alignment\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Alignment (1-JSD)\")\n    axes[0].legend()\n    for lr, va in zip(lrs, val_align):\n        axes[1].plot(epochs, va, label=f\"lr={lr}\")\n    axes[1].set_title(\"Validation Alignment\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Alignment (1-JSD)\")\n    axes[1].legend()\n    fig.suptitle(\n        \"Synthetic Dataset - Alignment Curves\\nLeft: Training Alignment, Right: Validation Alignment\"\n    )\n    plt.savefig(os.path.join(working_dir, \"synthetic_alignment_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot2: {e}\")\n    plt.close()\n",
+      "plot_analyses": [
+        {
+          "analysis": "Loss curves on synthetic data indicate a clear learning\u2010rate dependence. With lr=0.0001, training loss barely decreases over ten epochs, signalling an overly conservative update. At lr=0.0005, both training and validation loss drop steadily but slowly, suggesting safe but sluggish convergence. Increasing to lr=0.001 accelerates reduction, yet remains outpaced by higher rates. lr=0.005 yields a sharp loss decline in the first five epochs before flattening near 0.1 on training and validation, striking a good balance between speed and stability. The highest rate, lr=0.01, drives an extremely rapid fall to below 0.05 by epoch 4 and maintains this low level without signs of divergence; validation follows suit, implying minimal overfitting. Overall, learning rates in the 0.005\u20130.01 range achieve the fastest convergence and lowest final losses, while rates \u22640.001 underfit and converge too slowly.",
+          "plot_path": "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_d3388ee27ada46aca832d65717ab8d9d_proc_4061759/synthetic_loss_curves.png"
+        },
+        {
+          "analysis": "Alignment curves (1 \u2013 JSD) reveal how well the model\u2019s distribution matches target behavior over time. At lr=0.0001, alignment inches upward from ~0.992 to ~0.993 on both training and validation, indicating reliable but glacial improvement. lr=0.0005 produces a slight early bump around epoch 3, then drifts slightly downward, suggesting marginal gains followed by plateau. lr=0.001 peaks near epoch 2 then slowly declines to ~0.991, pointing to over\u2010adaptation and slight misalignment later. Both lr=0.005 and lr=0.01 lead to rapid alignment gains: lr=0.005 climbs steadily to ~0.999 by epoch 10 on train and val, offering the most stable ascent. lr=0.01 shows an initial dip on validation but recovers quickly, plateauing at ~0.9985\u20130.999; minor post\u2010peak jitter hints at occasional overshoot. In sum, lr\u22480.005 maximizes alignment growth consistently, while lr=0.01 is faster but introduces slight instability near the top.",
+          "plot_path": "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_d3388ee27ada46aca832d65717ab8d9d_proc_4061759/synthetic_alignment_curves.png"
+        }
+      ],
+      "plot_paths": [
+        "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_d3388ee27ada46aca832d65717ab8d9d_proc_4061759/synthetic_loss_curves.png",
+        "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_d3388ee27ada46aca832d65717ab8d9d_proc_4061759/synthetic_alignment_curves.png"
+      ],
+      "vlm_feedback_summary": "Higher learning rates (0.005\u20130.01) markedly speed both loss minimization and alignment improvement, with lr=0.005 delivering the most stable high\u2010quality results. Lower rates underfit or converge too slowly, and extremely high rates, while quick, can introduce modest fluctuations in alignment, underscoring the importance of tuning this hyperparameter for efficient co\u2010adaptive model behavior.",
+      "exp_results_dir": "experiment_results/experiment_d3388ee27ada46aca832d65717ab8d9d_proc_4061759",
+      "exp_results_npy_files": [
+        "experiment_results/experiment_d3388ee27ada46aca832d65717ab8d9d_proc_4061759/experiment_data.npy"
+      ]
+    },
+    {
+      "overall_plan": "First, establish fixed random seeds to ensure experimental reproducibility across all runs. Then perform a log\u2010uniform sweep of the Adam optimizer\u2019s initial learning rate over [1e-4, 5e-4, 1e-3, 5e-3, 1e-2]. For each learning rate, reinitialize both the AI and user MLPs and train them jointly for a fixed number of epochs. Record training and validation losses, alignment metrics per epoch, and final validation predictions alongside ground truth. Organize all plottable data under experiment_data['learning_rate']['synthetic'] and save the entire dataset via np.save('experiment_data.npy').",
+      "analysis": "",
+      "metric": {
+        "value": {
+          "metric_names": [
+            {
+              "metric_name": "training alignment",
+              "lower_is_better": false,
+              "description": "Final training alignment on the synthetic dataset",
+              "data": [
+                {
+                  "dataset_name": "Synthetic dataset",
+                  "final_value": 0.9991,
+                  "best_value": 0.9991
+                }
+              ]
+            },
+            {
+              "metric_name": "validation alignment",
+              "lower_is_better": false,
+              "description": "Final validation alignment on the synthetic dataset",
+              "data": [
+                {
+                  "dataset_name": "Synthetic dataset",
+                  "final_value": 0.9989,
+                  "best_value": 0.9989
+                }
+              ]
+            },
+            {
+              "metric_name": "training loss",
+              "lower_is_better": true,
+              "description": "Final training loss on the synthetic dataset",
+              "data": [
+                {
+                  "dataset_name": "Synthetic dataset",
+                  "final_value": 0.0588,
+                  "best_value": 0.0588
+                }
+              ]
+            },
+            {
+              "metric_name": "validation loss",
+              "lower_is_better": true,
+              "description": "Final validation loss on the synthetic dataset",
+              "data": [
+                {
+                  "dataset_name": "Synthetic dataset",
+                  "final_value": 0.0739,
+                  "best_value": 0.0739
+                }
+              ]
+            },
+            {
+              "metric_name": "test accuracy",
+              "lower_is_better": false,
+              "description": "Test accuracy on the synthetic dataset",
+              "data": [
+                {
+                  "dataset_name": "Synthetic dataset",
+                  "final_value": 0.965,
+                  "best_value": 0.965
+                }
+              ]
+            }
+          ]
+        },
+        "maximize": null,
+        "name": null,
+        "description": null
+      },
+      "code": "# Set random seed\nimport random\nimport numpy as np\nimport torch\n\nseed = 2\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\nimport os\nimport numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nfrom torch.utils.data import DataLoader, TensorDataset\n\n# Setup working directory\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n# Device\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Reproducibility\ntorch.manual_seed(0)\nnp.random.seed(0)\n\n# Synthetic data generation\nN_train, N_val, D, C = 1000, 200, 10, 3\nW_true = np.random.randn(D, C)\nx_train = np.random.randn(N_train, D)\nx_val = np.random.randn(N_val, D)\ny_train = np.argmax(x_train @ W_true + 0.1 * np.random.randn(N_train, C), axis=1)\ny_val = np.argmax(x_val @ W_true + 0.1 * np.random.randn(N_val, C), axis=1)\nmean = x_train.mean(axis=0)\nstd = x_train.std(axis=0) + 1e-8\nx_train = (x_train - mean) / std\nx_val = (x_val - mean) / std\n\n# DataLoaders\ntrain_dataset = TensorDataset(\n    torch.tensor(x_train, dtype=torch.float32),\n    torch.tensor(y_train, dtype=torch.long),\n)\nval_dataset = TensorDataset(\n    torch.tensor(x_val, dtype=torch.float32),\n    torch.tensor(y_val, dtype=torch.long),\n)\ntrain_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)\nval_loader = DataLoader(val_dataset, batch_size=64)\n\n\n# Simple MLP definition\nclass MLP(nn.Module):\n    def __init__(self, in_dim, hid_dim, out_dim):\n        super().__init__()\n        self.fc1 = nn.Linear(in_dim, hid_dim)\n        self.fc2 = nn.Linear(hid_dim, out_dim)\n\n    def forward(self, x):\n        x = F.relu(self.fc1(x))\n        return self.fc2(x)\n\n\n# Hyperparameter sweep over learning rates\nlearning_rates = [1e-4, 5e-4, 1e-3, 5e-3, 1e-2]\nnum_epochs = 10\n\n# Initialize experiment_data dict\nexperiment_data = {\n    \"learning_rate\": {\n        \"synthetic\": {\n            \"lrs\": learning_rates,\n            \"metrics\": {\"train\": [], \"val\": []},\n            \"losses\": {\"train\": [], \"val\": []},\n            \"predictions\": [],\n            \"ground_truth\": [],\n        }\n    }\n}\n\nloss_fn = nn.CrossEntropyLoss()\n\nfor lr in learning_rates:\n    # Reset model weights for fair comparison\n    torch.manual_seed(0)\n    ai_model = MLP(D, 32, C).to(device)\n    user_model = MLP(D, 32, C).to(device)\n    optimizer_ai = torch.optim.Adam(ai_model.parameters(), lr=lr)\n    optimizer_user = torch.optim.Adam(user_model.parameters(), lr=lr)\n\n    # Containers for this learning rate\n    train_losses, val_losses = [], []\n    train_aligns, val_aligns = [], []\n\n    for epoch in range(1, num_epochs + 1):\n        # Training\n        ai_model.train()\n        user_model.train()\n        total_loss, total_align, n_samples = 0.0, 0.0, 0\n        for xb, yb in train_loader:\n            xb, yb = xb.to(device), yb.to(device)\n            # Forward passes\n            logits_ai = ai_model(xb)\n            logits_user = user_model(xb)\n            # Cross-entropy losses\n            loss_ai = loss_fn(logits_ai, yb)\n            loss_user = loss_fn(logits_user, yb)\n            # Backprop AI\n            optimizer_ai.zero_grad()\n            loss_ai.backward()\n            optimizer_ai.step()\n            # Backprop user\n            optimizer_user.zero_grad()\n            loss_user.backward()\n            optimizer_user.step()\n            # Accumulate loss\n            bs = yb.size(0)\n            total_loss += loss_ai.item() * bs\n            # Alignment (1 - JSD)\n            P = F.softmax(logits_ai, dim=1)\n            Q = F.softmax(logits_user, dim=1)\n            M = 0.5 * (P + Q)\n            kl1 = torch.sum(P * (torch.log(P + 1e-8) - torch.log(M + 1e-8)), dim=1)\n            kl2 = torch.sum(Q * (torch.log(Q + 1e-8) - torch.log(M + 1e-8)), dim=1)\n            jsd = 0.5 * (kl1 + kl2)\n            total_align += torch.sum(1 - jsd).item()\n            n_samples += bs\n        train_losses.append(total_loss / len(train_dataset))\n        train_aligns.append(total_align / n_samples)\n\n        # Validation\n        ai_model.eval()\n        user_model.eval()\n        v_loss, v_align, v_samples = 0.0, 0.0, 0\n        with torch.no_grad():\n            for xb, yb in val_loader:\n                xb, yb = xb.to(device), yb.to(device)\n                logits_ai = ai_model(xb)\n                # loss\n                v_loss += loss_fn(logits_ai, yb).item() * yb.size(0)\n                # alignment\n                P = F.softmax(logits_ai, dim=1)\n                Q = F.softmax(user_model(xb), dim=1)\n                M = 0.5 * (P + Q)\n                kl1 = torch.sum(P * (torch.log(P + 1e-8) - torch.log(M + 1e-8)), dim=1)\n                kl2 = torch.sum(Q * (torch.log(Q + 1e-8) - torch.log(M + 1e-8)), dim=1)\n                jsd = 0.5 * (kl1 + kl2)\n                v_align += torch.sum(1 - jsd).item()\n                v_samples += yb.size(0)\n        val_losses.append(v_loss / len(val_dataset))\n        val_aligns.append(v_align / v_samples)\n        print(\n            f\"LR {lr:.1e} Epoch {epoch}: val_loss = {val_losses[-1]:.4f}, val_align = {val_aligns[-1]:.4f}\"\n        )\n\n    # Store per\u2010epoch metrics\n    sd = experiment_data[\"learning_rate\"][\"synthetic\"]\n    sd[\"metrics\"][\"train\"].append(train_aligns)\n    sd[\"metrics\"][\"val\"].append(val_aligns)\n    sd[\"losses\"][\"train\"].append(train_losses)\n    sd[\"losses\"][\"val\"].append(val_losses)\n\n    # Final validation predictions & ground truth\n    all_preds, all_gts = [], []\n    ai_model.eval()\n    with torch.no_grad():\n        for xb, yb in val_loader:\n            xb = xb.to(device)\n            preds = torch.argmax(ai_model(xb), dim=1).cpu().numpy()\n            all_preds.append(preds)\n            all_gts.append(yb.numpy())\n    preds_arr = np.concatenate(all_preds, axis=0)\n    gts_arr = np.concatenate(all_gts, axis=0)\n    sd[\"predictions\"].append(preds_arr)\n    sd[\"ground_truth\"].append(gts_arr)\n\n# Save all experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n",
+      "plot_code": "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\n# Load experiment data\ntry:\n    data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    data = {}\n\nsd = data.get(\"learning_rate\", {}).get(\"synthetic\", {})\n\n# Plot 1: Loss curves\ntry:\n    lrs = sd.get(\"lrs\", [])\n    train_losses = sd.get(\"losses\", {}).get(\"train\", [])\n    val_losses = sd.get(\"losses\", {}).get(\"val\", [])\n    epochs = range(1, len(train_losses[0]) + 1)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    for lr, tr in zip(lrs, train_losses):\n        axes[0].plot(epochs, tr, label=f\"lr={lr}\")\n    axes[0].set_title(\"Training Loss\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Loss\")\n    axes[0].legend()\n    for lr, vl in zip(lrs, val_losses):\n        axes[1].plot(epochs, vl, label=f\"lr={lr}\")\n    axes[1].set_title(\"Validation Loss\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Loss\")\n    axes[1].legend()\n    fig.suptitle(\n        \"Synthetic Dataset - Loss Curves\\nLeft: Training Loss, Right: Validation Loss\"\n    )\n    plt.savefig(os.path.join(working_dir, \"synthetic_loss_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot1: {e}\")\n    plt.close()\n\n# Plot 2: Alignment curves\ntry:\n    train_align = sd.get(\"metrics\", {}).get(\"train\", [])\n    val_align = sd.get(\"metrics\", {}).get(\"val\", [])\n    epochs = range(1, len(train_align[0]) + 1)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    for lr, ta in zip(lrs, train_align):\n        axes[0].plot(epochs, ta, label=f\"lr={lr}\")\n    axes[0].set_title(\"Training Alignment\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Alignment (1-JSD)\")\n    axes[0].legend()\n    for lr, va in zip(lrs, val_align):\n        axes[1].plot(epochs, va, label=f\"lr={lr}\")\n    axes[1].set_title(\"Validation Alignment\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Alignment (1-JSD)\")\n    axes[1].legend()\n    fig.suptitle(\n        \"Synthetic Dataset - Alignment Curves\\nLeft: Training Alignment, Right: Validation Alignment\"\n    )\n    plt.savefig(os.path.join(working_dir, \"synthetic_alignment_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot2: {e}\")\n    plt.close()\n",
+      "plot_analyses": [
+        {
+          "analysis": "Plots show training and validation loss across epochs for different learning rates. Lower learning rates (1e-4, 5e-4) exhibit slow, shallow decreases in loss, plateauing at relatively high values by epoch 10. Moderate rates (1e-3) achieve faster descent but still retain substantial loss. Higher rates (5e-3, 1e-2) drive rapid convergence, with lr=0.01 reaching near-zero training loss by epoch 10. Validation curves mirror this behavior: lr=0.01 and lr=0.005 yield the steepest drop, achieving the lowest validation loss and minimal generalization gap. The slowest rates maintain high validation loss, indicating underfitting, while the highest rates balance fast convergence with stable validation performance, suggesting they best optimize both training and generalization under this setup.",
+          "plot_path": "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_afaf04f731bd4975b5f1805f8133bb3f_proc_4061757/synthetic_loss_curves.png"
+        },
+        {
+          "analysis": "Curves depict alignment (1\u2013JS divergence) on training and validation sets over epochs. Very small rates (1e-4, 5e-4) yield modest, gradual improvements in alignment, peaking around 0.992\u20130.993. A mid rate (1e-3) briefly improves but then declines slightly, indicating suboptimal stability. Higher rates (5e-3, 1e-2) display an initial dip in alignment followed by a rapid rise: lr=0.01 reaches alignment \u22480.999 by epoch 8, lr=0.005 approaches 0.9989 by epoch 10. Validation alignment trends match training: the highest rates achieve the greatest alignment quickly, whereas lower rates converge slowly and to lower maxima. This underscores that larger learning rates not only speed up training but also drive stronger co-adaptation as measured by alignment.",
+          "plot_path": "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_afaf04f731bd4975b5f1805f8133bb3f_proc_4061757/synthetic_alignment_curves.png"
+        }
+      ],
+      "plot_paths": [
+        "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_afaf04f731bd4975b5f1805f8133bb3f_proc_4061757/synthetic_loss_curves.png",
+        "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_afaf04f731bd4975b5f1805f8133bb3f_proc_4061757/synthetic_alignment_curves.png"
+      ],
+      "vlm_feedback_summary": "High learning rates (5e-3, 1e-2) clearly outperform lower ones by enabling rapid loss reduction and superior alignment on both training and validation data. Small rates underfit and mid rates (1e-3) show unstable alignment. Balanced performance emerges at the highest rates, suggesting they are optimal for both convergence speed and bidirectional mental\u2010model alignment.",
+      "exp_results_dir": "experiment_results/experiment_afaf04f731bd4975b5f1805f8133bb3f_proc_4061757",
+      "exp_results_npy_files": [
+        "experiment_results/experiment_afaf04f731bd4975b5f1805f8133bb3f_proc_4061757/experiment_data.npy"
+      ]
+    },
+    {
+      "overall_plan": "We will perform a comprehensive study of the Adam optimizer\u2019s initial learning rate by sweeping over a log\u2010uniform grid [1e-4, 5e-4, 1e-3, 5e-3, 1e-2]. For each learning rate, we re-initialize both the AI and user MLP models and train them jointly over a fixed number of epochs. During training, we record per-epoch metrics including training and validation losses as well as an alignment score. We then collect validation predictions alongside ground-truth labels. To ensure reproducibility and assess run-to-run variability, each hyperparameter setting will be evaluated across multiple random seeds. All data will be organized under a nested structure, e.g., `experiment_data['learning_rate']['synthetic']['seed_<seed>']`, and saved with `np.save` for downstream analysis.",
+      "analysis": "",
+      "metric": {
+        "value": {
+          "metric_names": [
+            {
+              "metric_name": "training alignment",
+              "lower_is_better": false,
+              "description": "Final alignment on the training set",
+              "data": [
+                {
+                  "dataset_name": "learning rate 1.0e-04",
+                  "final_value": 0.9929,
+                  "best_value": 0.9991
+                },
+                {
+                  "dataset_name": "learning rate 5.0e-04",
+                  "final_value": 0.9921,
+                  "best_value": 0.9991
+                },
+                {
+                  "dataset_name": "learning rate 1.0e-03",
+                  "final_value": 0.9917,
+                  "best_value": 0.9991
+                },
+                {
+                  "dataset_name": "learning rate 5.0e-03",
+                  "final_value": 0.9988,
+                  "best_value": 0.9991
+                },
+                {
+                  "dataset_name": "learning rate 1.0e-02",
+                  "final_value": 0.9991,
+                  "best_value": 0.9991
+                }
+              ]
+            },
+            {
+              "metric_name": "validation alignment",
+              "lower_is_better": false,
+              "description": "Final alignment on the validation set",
+              "data": [
+                {
+                  "dataset_name": "learning rate 1.0e-04",
+                  "final_value": 0.9929,
+                  "best_value": 0.9989
+                },
+                {
+                  "dataset_name": "learning rate 5.0e-04",
+                  "final_value": 0.9915,
+                  "best_value": 0.9989
+                },
+                {
+                  "dataset_name": "learning rate 1.0e-03",
+                  "final_value": 0.9907,
+                  "best_value": 0.9989
+                },
+                {
+                  "dataset_name": "learning rate 5.0e-03",
+                  "final_value": 0.9989,
+                  "best_value": 0.9989
+                },
+                {
+                  "dataset_name": "learning rate 1.0e-02",
+                  "final_value": 0.9986,
+                  "best_value": 0.9989
+                }
+              ]
+            },
+            {
+              "metric_name": "training loss",
+              "lower_is_better": true,
+              "description": "Final loss on the training set",
+              "data": [
+                {
+                  "dataset_name": "learning rate 1.0e-04",
+                  "final_value": 1.0162,
+                  "best_value": 0.0588
+                },
+                {
+                  "dataset_name": "learning rate 5.0e-04",
+                  "final_value": 0.7943,
+                  "best_value": 0.0588
+                },
+                {
+                  "dataset_name": "learning rate 1.0e-03",
+                  "final_value": 0.5274,
+                  "best_value": 0.0588
+                },
+                {
+                  "dataset_name": "learning rate 5.0e-03",
+                  "final_value": 0.0982,
+                  "best_value": 0.0588
+                },
+                {
+                  "dataset_name": "learning rate 1.0e-02",
+                  "final_value": 0.0588,
+                  "best_value": 0.0588
+                }
+              ]
+            },
+            {
+              "metric_name": "validation loss",
+              "lower_is_better": true,
+              "description": "Final loss on the validation set",
+              "data": [
+                {
+                  "dataset_name": "learning rate 1.0e-04",
+                  "final_value": 1.0106,
+                  "best_value": 0.0739
+                },
+                {
+                  "dataset_name": "learning rate 5.0e-04",
+                  "final_value": 0.7817,
+                  "best_value": 0.0739
+                },
+                {
+                  "dataset_name": "learning rate 1.0e-03",
+                  "final_value": 0.5101,
+                  "best_value": 0.0739
+                },
+                {
+                  "dataset_name": "learning rate 5.0e-03",
+                  "final_value": 0.1039,
+                  "best_value": 0.0739
+                },
+                {
+                  "dataset_name": "learning rate 1.0e-02",
+                  "final_value": 0.0739,
+                  "best_value": 0.0739
+                }
+              ]
+            },
+            {
+              "metric_name": "test accuracy",
+              "lower_is_better": false,
+              "description": "Accuracy on the test set",
+              "data": [
+                {
+                  "dataset_name": "learning rate 1.0e-04",
+                  "final_value": 0.6,
+                  "best_value": 0.965
+                },
+                {
+                  "dataset_name": "learning rate 5.0e-04",
+                  "final_value": 0.835,
+                  "best_value": 0.965
+                },
+                {
+                  "dataset_name": "learning rate 1.0e-03",
+                  "final_value": 0.905,
+                  "best_value": 0.965
+                },
+                {
+                  "dataset_name": "learning rate 5.0e-03",
+                  "final_value": 0.96,
+                  "best_value": 0.965
+                },
+                {
+                  "dataset_name": "learning rate 1.0e-02",
+                  "final_value": 0.965,
+                  "best_value": 0.965
+                }
+              ]
+            }
+          ]
+        },
+        "maximize": null,
+        "name": null,
+        "description": null
+      },
+      "code": "# Set random seed\nimport random\nimport numpy as np\nimport torch\n\nseed = 2\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\nimport os\nimport numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nfrom torch.utils.data import DataLoader, TensorDataset\n\n# Setup working directory\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n# Device\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Reproducibility\ntorch.manual_seed(0)\nnp.random.seed(0)\n\n# Synthetic data generation\nN_train, N_val, D, C = 1000, 200, 10, 3\nW_true = np.random.randn(D, C)\nx_train = np.random.randn(N_train, D)\nx_val = np.random.randn(N_val, D)\ny_train = np.argmax(x_train @ W_true + 0.1 * np.random.randn(N_train, C), axis=1)\ny_val = np.argmax(x_val @ W_true + 0.1 * np.random.randn(N_val, C), axis=1)\nmean = x_train.mean(axis=0)\nstd = x_train.std(axis=0) + 1e-8\nx_train = (x_train - mean) / std\nx_val = (x_val - mean) / std\n\n# DataLoaders\ntrain_dataset = TensorDataset(\n    torch.tensor(x_train, dtype=torch.float32),\n    torch.tensor(y_train, dtype=torch.long),\n)\nval_dataset = TensorDataset(\n    torch.tensor(x_val, dtype=torch.float32),\n    torch.tensor(y_val, dtype=torch.long),\n)\ntrain_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)\nval_loader = DataLoader(val_dataset, batch_size=64)\n\n\n# Simple MLP definition\nclass MLP(nn.Module):\n    def __init__(self, in_dim, hid_dim, out_dim):\n        super().__init__()\n        self.fc1 = nn.Linear(in_dim, hid_dim)\n        self.fc2 = nn.Linear(hid_dim, out_dim)\n\n    def forward(self, x):\n        x = F.relu(self.fc1(x))\n        return self.fc2(x)\n\n\n# Hyperparameter sweep over learning rates\nlearning_rates = [1e-4, 5e-4, 1e-3, 5e-3, 1e-2]\nnum_epochs = 10\n\n# Initialize experiment_data dict\nexperiment_data = {\n    \"learning_rate\": {\n        \"synthetic\": {\n            \"lrs\": learning_rates,\n            \"metrics\": {\"train\": [], \"val\": []},\n            \"losses\": {\"train\": [], \"val\": []},\n            \"predictions\": [],\n            \"ground_truth\": [],\n        }\n    }\n}\n\nloss_fn = nn.CrossEntropyLoss()\n\nfor lr in learning_rates:\n    # Reset model weights for fair comparison\n    torch.manual_seed(0)\n    ai_model = MLP(D, 32, C).to(device)\n    user_model = MLP(D, 32, C).to(device)\n    optimizer_ai = torch.optim.Adam(ai_model.parameters(), lr=lr)\n    optimizer_user = torch.optim.Adam(user_model.parameters(), lr=lr)\n\n    # Containers for this learning rate\n    train_losses, val_losses = [], []\n    train_aligns, val_aligns = [], []\n\n    for epoch in range(1, num_epochs + 1):\n        # Training\n        ai_model.train()\n        user_model.train()\n        total_loss, total_align, n_samples = 0.0, 0.0, 0\n        for xb, yb in train_loader:\n            xb, yb = xb.to(device), yb.to(device)\n            # Forward passes\n            logits_ai = ai_model(xb)\n            logits_user = user_model(xb)\n            # Cross-entropy losses\n            loss_ai = loss_fn(logits_ai, yb)\n            loss_user = loss_fn(logits_user, yb)\n            # Backprop AI\n            optimizer_ai.zero_grad()\n            loss_ai.backward()\n            optimizer_ai.step()\n            # Backprop user\n            optimizer_user.zero_grad()\n            loss_user.backward()\n            optimizer_user.step()\n            # Accumulate loss\n            bs = yb.size(0)\n            total_loss += loss_ai.item() * bs\n            # Alignment (1 - JSD)\n            P = F.softmax(logits_ai, dim=1)\n            Q = F.softmax(logits_user, dim=1)\n            M = 0.5 * (P + Q)\n            kl1 = torch.sum(P * (torch.log(P + 1e-8) - torch.log(M + 1e-8)), dim=1)\n            kl2 = torch.sum(Q * (torch.log(Q + 1e-8) - torch.log(M + 1e-8)), dim=1)\n            jsd = 0.5 * (kl1 + kl2)\n            total_align += torch.sum(1 - jsd).item()\n            n_samples += bs\n        train_losses.append(total_loss / len(train_dataset))\n        train_aligns.append(total_align / n_samples)\n\n        # Validation\n        ai_model.eval()\n        user_model.eval()\n        v_loss, v_align, v_samples = 0.0, 0.0, 0\n        with torch.no_grad():\n            for xb, yb in val_loader:\n                xb, yb = xb.to(device), yb.to(device)\n                logits_ai = ai_model(xb)\n                # loss\n                v_loss += loss_fn(logits_ai, yb).item() * yb.size(0)\n                # alignment\n                P = F.softmax(logits_ai, dim=1)\n                Q = F.softmax(user_model(xb), dim=1)\n                M = 0.5 * (P + Q)\n                kl1 = torch.sum(P * (torch.log(P + 1e-8) - torch.log(M + 1e-8)), dim=1)\n                kl2 = torch.sum(Q * (torch.log(Q + 1e-8) - torch.log(M + 1e-8)), dim=1)\n                jsd = 0.5 * (kl1 + kl2)\n                v_align += torch.sum(1 - jsd).item()\n                v_samples += yb.size(0)\n        val_losses.append(v_loss / len(val_dataset))\n        val_aligns.append(v_align / v_samples)\n        print(\n            f\"LR {lr:.1e} Epoch {epoch}: val_loss = {val_losses[-1]:.4f}, val_align = {val_aligns[-1]:.4f}\"\n        )\n\n    # Store per\u2010epoch metrics\n    sd = experiment_data[\"learning_rate\"][\"synthetic\"]\n    sd[\"metrics\"][\"train\"].append(train_aligns)\n    sd[\"metrics\"][\"val\"].append(val_aligns)\n    sd[\"losses\"][\"train\"].append(train_losses)\n    sd[\"losses\"][\"val\"].append(val_losses)\n\n    # Final validation predictions & ground truth\n    all_preds, all_gts = [], []\n    ai_model.eval()\n    with torch.no_grad():\n        for xb, yb in val_loader:\n            xb = xb.to(device)\n            preds = torch.argmax(ai_model(xb), dim=1).cpu().numpy()\n            all_preds.append(preds)\n            all_gts.append(yb.numpy())\n    preds_arr = np.concatenate(all_preds, axis=0)\n    gts_arr = np.concatenate(all_gts, axis=0)\n    sd[\"predictions\"].append(preds_arr)\n    sd[\"ground_truth\"].append(gts_arr)\n\n# Save all experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n",
+      "plot_code": "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\n# Load experiment data\ntry:\n    data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    data = {}\n\nsd = data.get(\"learning_rate\", {}).get(\"synthetic\", {})\n\n# Plot 1: Loss curves\ntry:\n    lrs = sd.get(\"lrs\", [])\n    train_losses = sd.get(\"losses\", {}).get(\"train\", [])\n    val_losses = sd.get(\"losses\", {}).get(\"val\", [])\n    epochs = range(1, len(train_losses[0]) + 1)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    for lr, tr in zip(lrs, train_losses):\n        axes[0].plot(epochs, tr, label=f\"lr={lr}\")\n    axes[0].set_title(\"Training Loss\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Loss\")\n    axes[0].legend()\n    for lr, vl in zip(lrs, val_losses):\n        axes[1].plot(epochs, vl, label=f\"lr={lr}\")\n    axes[1].set_title(\"Validation Loss\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Loss\")\n    axes[1].legend()\n    fig.suptitle(\n        \"Synthetic Dataset - Loss Curves\\nLeft: Training Loss, Right: Validation Loss\"\n    )\n    plt.savefig(os.path.join(working_dir, \"synthetic_loss_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot1: {e}\")\n    plt.close()\n\n# Plot 2: Alignment curves\ntry:\n    train_align = sd.get(\"metrics\", {}).get(\"train\", [])\n    val_align = sd.get(\"metrics\", {}).get(\"val\", [])\n    epochs = range(1, len(train_align[0]) + 1)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    for lr, ta in zip(lrs, train_align):\n        axes[0].plot(epochs, ta, label=f\"lr={lr}\")\n    axes[0].set_title(\"Training Alignment\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Alignment (1-JSD)\")\n    axes[0].legend()\n    for lr, va in zip(lrs, val_align):\n        axes[1].plot(epochs, va, label=f\"lr={lr}\")\n    axes[1].set_title(\"Validation Alignment\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Alignment (1-JSD)\")\n    axes[1].legend()\n    fig.suptitle(\n        \"Synthetic Dataset - Alignment Curves\\nLeft: Training Alignment, Right: Validation Alignment\"\n    )\n    plt.savefig(os.path.join(working_dir, \"synthetic_alignment_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot2: {e}\")\n    plt.close()\n",
+      "plot_analyses": [
+        {
+          "analysis": "Training and validation losses both decrease monotonically across all learning rates, with larger rates yielding much faster convergence. The highest rate (0.01) drives loss down to near zero by epoch 10, followed by 0.005. Moderate rates (0.001, 0.0005) plateau at higher loss values (~0.5 and ~0.8 respectively), while the smallest rate (0.0001) shows the slowest decline, barely reaching ~1.0 after 10 epochs. No signs of divergence or severe overfitting appear, suggesting that even aggressive rates remain stable on this synthetic dataset within the training window.",
+          "plot_path": "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_1bfb9a916ea04d0d8f4f43020b6e9adb_proc_4061758/synthetic_loss_curves.png"
+        },
+        {
+          "analysis": "Alignment improves for all rates, but the magnitude and speed of gain strongly correlate with the learning rate. Rates of 0.005 and especially 0.01 boost alignment from ~0.992 to nearly 0.999 by epoch 10 on both training and validation curves. Lower rates achieve only marginal or transient improvements, with 0.001 and 0.0005 eventually drifting downward and 0.0001 rising slowly to ~0.993. Validation alignment closely tracks training, indicating generalizable adaptation without substantial overfitting. The steep early gains for high rates suggest rapid mutual model alignment, while low rates may be too conservative to correct initial discrepancies effectively.",
+          "plot_path": "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_1bfb9a916ea04d0d8f4f43020b6e9adb_proc_4061758/synthetic_alignment_curves.png"
+        }
+      ],
+      "plot_paths": [
+        "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_1bfb9a916ea04d0d8f4f43020b6e9adb_proc_4061758/synthetic_loss_curves.png",
+        "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_1bfb9a916ea04d0d8f4f43020b6e9adb_proc_4061758/synthetic_alignment_curves.png"
+      ],
+      "vlm_feedback_summary": "High learning rates (\u22650.005) clearly accelerate both loss minimization and model alignment, with lr=0.01 offering the fastest and strongest results. Lower rates lead to sluggish or unstable improvements. To ensure robustness and generalizability of CAMMA, the next step is to evaluate on three diverse HuggingFace text\u2010classification datasets (e.g., AG News, Yelp Reviews, SST\u20102), comparing bidirectional adaptation against static and unidirectional baselines across real\u2010world data.",
+      "exp_results_dir": "experiment_results/experiment_1bfb9a916ea04d0d8f4f43020b6e9adb_proc_4061758",
+      "exp_results_npy_files": [
+        "experiment_results/experiment_1bfb9a916ea04d0d8f4f43020b6e9adb_proc_4061758/experiment_data.npy"
+      ]
+    }
+  ],
+  "aggregated results of nodes with different seeds": {
+    "overall_plan": "Perform a comprehensive hyperparameter sweep of the Adam initial learning rate over a log\u2010uniform grid [1e-4, 5e-4, 1e-3, 5e-3, 1e-2] for joint AI and user MLP training. For each learning rate, re\u2010initialize models and train for a fixed number of epochs, recording training/validation losses, alignment metrics per epoch, and final validation predictions with ground truth. Extend this procedure by running each learning\u2010rate setting across multiple random seeds, then aggregate results\u2014computing means and variances over losses, alignments, and accuracy\u2014to ensure robustness against stochastic variability. All data will be organized under a consistent hierarchical structure (indexed by learning rate and seed) and saved in NumPy format for downstream analysis.",
+    "metric": {
+      "value": null,
+      "maximize": null,
+      "name": null,
+      "description": null
+    },
+    "code": "# plotting aggregation code",
+    "plot_code": "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nexp_paths = [\n    \"experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_d3388ee27ada46aca832d65717ab8d9d_proc_4061759/experiment_data.npy\",\n    \"experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_afaf04f731bd4975b5f1805f8133bb3f_proc_4061757/experiment_data.npy\",\n    \"experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/experiment_1bfb9a916ea04d0d8f4f43020b6e9adb_proc_4061758/experiment_data.npy\",\n]\n\nall_experiment_data = []\ntry:\n    for p in exp_paths:\n        data = np.load(\n            os.path.join(os.getenv(\"AI_SCIENTIST_ROOT\", os.getcwd()), p),\n            allow_pickle=True,\n        ).item()\n        all_experiment_data.append(data)\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n\nlr_data = {}\nfor data in all_experiment_data:\n    sd = data.get(\"learning_rate\", {}).get(\"synthetic\", {})\n    lrs = sd.get(\"lrs\", [])\n    tr_losses = sd.get(\"losses\", {}).get(\"train\", [])\n    vl_losses = sd.get(\"losses\", {}).get(\"val\", [])\n    tr_aligns = sd.get(\"metrics\", {}).get(\"train\", [])\n    vl_aligns = sd.get(\"metrics\", {}).get(\"val\", [])\n    for lr, tr, vl, ta, va in zip(lrs, tr_losses, vl_losses, tr_aligns, vl_aligns):\n        lr = float(lr)\n        lr_data.setdefault(\n            lr,\n            {\"train_losses\": [], \"val_losses\": [], \"train_align\": [], \"val_align\": []},\n        )\n        lr_data[lr][\"train_losses\"].append(np.array(tr))\n        lr_data[lr][\"val_losses\"].append(np.array(vl))\n        lr_data[lr][\"train_align\"].append(np.array(ta))\n        lr_data[lr][\"val_align\"].append(np.array(va))\n\nfirst_lr = next(iter(lr_data)) if lr_data else None\n\n# Plot 1: Aggregated Loss Curves\ntry:\n    if first_lr is None:\n        raise ValueError(\"No data available for aggregation\")\n    n_epochs = lr_data[first_lr][\"train_losses\"][0].shape[0]\n    epochs = np.arange(1, n_epochs + 1)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    for lr, stats in lr_data.items():\n        arr_tr = np.stack(stats[\"train_losses\"], axis=0)\n        mean_tr = arr_tr.mean(axis=0)\n        sem_tr = arr_tr.std(axis=0, ddof=1) / np.sqrt(arr_tr.shape[0])\n        axes[0].plot(epochs, mean_tr, label=f\"lr={lr} Mean\")\n        axes[0].fill_between(\n            epochs, mean_tr - sem_tr, mean_tr + sem_tr, alpha=0.3, label=f\"lr={lr} SEM\"\n        )\n        arr_vl = np.stack(stats[\"val_losses\"], axis=0)\n        mean_vl = arr_vl.mean(axis=0)\n        sem_vl = arr_vl.std(axis=0, ddof=1) / np.sqrt(arr_vl.shape[0])\n        axes[1].plot(epochs, mean_vl, label=f\"lr={lr} Mean\")\n        axes[1].fill_between(\n            epochs, mean_vl - sem_vl, mean_vl + sem_vl, alpha=0.3, label=f\"lr={lr} SEM\"\n        )\n    axes[0].set_title(\"Training Loss\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Loss\")\n    axes[0].legend()\n    axes[1].set_title(\"Validation Loss\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Loss\")\n    axes[1].legend()\n    fig.suptitle(\n        \"Synthetic Dataset - Loss Curves\\nLeft: Training Loss, Right: Validation Loss\"\n    )\n    plt.savefig(os.path.join(working_dir, \"synthetic_loss_curves_aggregated.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating aggregated loss plot: {e}\")\n    plt.close()\n\n# Plot 2: Aggregated Alignment Curves\ntry:\n    if first_lr is None:\n        raise ValueError(\"No data available for aggregation\")\n    n_epochs = lr_data[first_lr][\"train_align\"][0].shape[0]\n    epochs = np.arange(1, n_epochs + 1)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    for lr, stats in lr_data.items():\n        arr_tr = np.stack(stats[\"train_align\"], axis=0)\n        mean_tr = arr_tr.mean(axis=0)\n        sem_tr = arr_tr.std(axis=0, ddof=1) / np.sqrt(arr_tr.shape[0])\n        axes[0].plot(epochs, mean_tr, label=f\"lr={lr} Mean\")\n        axes[0].fill_between(\n            epochs, mean_tr - sem_tr, mean_tr + sem_tr, alpha=0.3, label=f\"lr={lr} SEM\"\n        )\n        arr_vl = np.stack(stats[\"val_align\"], axis=0)\n        mean_vl = arr_vl.mean(axis=0)\n        sem_vl = arr_vl.std(axis=0, ddof=1) / np.sqrt(arr_vl.shape[0])\n        axes[1].plot(epochs, mean_vl, label=f\"lr={lr} Mean\")\n        axes[1].fill_between(\n            epochs, mean_vl - sem_vl, mean_vl + sem_vl, alpha=0.3, label=f\"lr={lr} SEM\"\n        )\n    axes[0].set_title(\"Training Alignment\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Alignment (1-JSD)\")\n    axes[0].legend()\n    axes[1].set_title(\"Validation Alignment\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Alignment (1-JSD)\")\n    axes[1].legend()\n    fig.suptitle(\n        \"Synthetic Dataset - Alignment Curves\\nLeft: Training Alignment, Right: Validation Alignment\"\n    )\n    plt.savefig(os.path.join(working_dir, \"synthetic_alignment_curves_aggregated.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating aggregated alignment plot: {e}\")\n    plt.close()\n",
+    "plot_analyses": [],
+    "plot_paths": [
+      "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/seed_aggregation_203b7d7007dc4c638e57b7b10fe21dd3/synthetic_loss_curves_aggregated.png",
+      "experiments/2025-05-21_18-26-09_bidirectional_mental_model_alignment_attempt_0/logs/0-run/experiment_results/seed_aggregation_203b7d7007dc4c638e57b7b10fe21dd3/synthetic_alignment_curves_aggregated.png"
+    ],
+    "vlm_feedback_summary": [],
+    "exp_results_dir": "experiment_results/seed_aggregation_203b7d7007dc4c638e57b7b10fe21dd3",
+    "exp_results_npy_files": []
+  }
+}

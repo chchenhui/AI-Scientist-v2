@@ -1,0 +1,145 @@
+
+% Miller, 2017 provides a comprehensive review of explanation in AI from a social‐sciences perspective, discussing how users form mental models of AI systems. Cite this in the Related Work section when summarizing foundational research on user mental models and explanations.
+@article{miller2017explanationia,
+ author = {Tim Miller},
+ booktitle = {Artificial Intelligence},
+ journal = {ArXiv},
+ title = {Explanation in Artificial Intelligence: Insights from the Social Sciences},
+ volume = {abs/1706.07269},
+ year = {2017}
+}
+
+% Kulesza et al. (2015) ‘Principles of Explanatory Debugging to Personalize Interactive Machine Learning’ from IUI 2015. Introduces interactive explanation mechanisms that allow users to correct AI misconceptions, directly relevant to our explanation adaptation component in the bidirectional alignment framework. Cite in Related Work when discussing personalized AI explanations and user mental model correction.
+@book{kulesza2015principlesoe,
+ author = {Todd Kulesza and M. Burnett and Weng-Keen Wong and S. Stumpf},
+ booktitle = {International Conference on Intelligent User Interfaces},
+ journal = {Proceedings of the 20th International Conference on Intelligent User Interfaces},
+ title = {Principles of Explanatory Debugging to Personalize Interactive Machine Learning},
+ year = {2015}
+}
+
+% Hadfield-Menell et al. (2016) 'Cooperative Inverse Reinforcement Learning' formalizes value alignment as a cooperative POMDP where an AI agent infers a human’s reward function during interaction. This work provides the theoretical foundation for our bidirectional user preference modeling and should be cited in the Related Work section on IRL-based user modeling.
+@article{hadfield-menell2016cooperativeir,
+ author = {Dylan Hadfield-Menell and Stuart J. Russell and P. Abbeel and A. Dragan},
+ booktitle = {Neural Information Processing Systems},
+ pages = {3909-3917},
+ title = {Cooperative Inverse Reinforcement Learning},
+ year = {2016}
+}
+
+% Kingma & Ba (2014) introduce Adam, a first-order gradient-based stochastic optimization method using adaptive moment estimates. This paper should be cited in the Methods/Experimental Setup section when describing the optimizer and hyperparameter sweep using Adam.
+@article{kingma2014adamam,
+ author = {Diederik P. Kingma and Jimmy Ba},
+ booktitle = {International Conference on Learning Representations},
+ journal = {CoRR},
+ title = {Adam: A Method for Stochastic Optimization},
+ volume = {abs/1412.6980},
+ year = {2014}
+}
+
+% Jianhua Lin (1991) introduces the Jensen–Shannon divergence, a symmetric and bounded information-theoretic measure based on Shannon entropy. Cite this in the Methods section where we define the Mutual Model Alignment Score as one minus the Jensen–Shannon divergence between model output distributions.
+@article{lin1991divergencemb,
+ author = {Jianhua Lin},
+ booktitle = {IEEE Transactions on Information Theory},
+ journal = {IEEE Trans. Inf. Theory},
+ pages = {145-151},
+ title = {Divergence measures based on the Shannon entropy},
+ volume = {37},
+ year = {1991}
+}
+
+% Lee & See (2004) provide a foundational framework and measurement scales for user trust in automated systems. Cite in the Methods section when describing how trustworthiness and calibrated trust are assessed in our experiments.
+@article{lee2004trustia,
+ author = {John D. Lee and Katrina A. See},
+ booktitle = {Hum. Factors},
+ journal = {Human Factors: The Journal of Human Factors and Ergonomics Society},
+ pages = {50 - 80},
+ title = {Trust in Automation: Designing for Appropriate Reliance},
+ volume = {46},
+ year = {2004}
+}
+
+% Marco Tulio Ribeiro et al. (2016) introduce LIME (‘Why Should I Trust You?’: Explaining the Predictions of Any Classifier), a model-agnostic local explanation technique that builds interpretable surrogate models around individual predictions. Cite this in the Methods and Experiments sections when describing the static explanation baseline.
+@book{ribeiro2016whysi,
+ author = {Marco Tulio Ribeiro and Sameer Singh and Carlos Guestrin},
+ booktitle = {North American Chapter of the Association for Computational Linguistics},
+ journal = {Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining},
+ title = {“Why Should I Trust You?”: Explaining the Predictions of Any Classifier},
+ year = {2016}
+}
+
+% J. A. Fails and D. Olsen’s ‘Interactive machine learning’ (IUI 2003) introduces the core human–in–the–loop co-adaptive framework. Cite in the Related Work section when discussing the origins of bidirectional adaptation and co-adaptive learning loops.
+@inproceedings{fails2003interactiveml,
+ author = {J. A. Fails and D. Olsen},
+ booktitle = {International Conference on Intelligent User Interfaces},
+ pages = {39-45},
+ title = {Interactive machine learning},
+ year = {2003}
+}
+
+% Saleema Amershi et al. (2014): "Power to the People: The Role of Humans in Interactive Machine Learning". AI Magazine. A foundational survey of interactive ML systems, detailing case studies of human involvement, common failure modes, and design principles. Cite in the Related Work section to contextualize the broader landscape of human–AI co-adaptation frameworks.
+@article{amershi2014powertt,
+ author = {Saleema Amershi and M. Cakmak and W. B. Knox and Todd Kulesza},
+ booktitle = {The AI Magazine},
+ journal = {AI Mag.},
+ pages = {105-120},
+ title = {Power to the People: The Role of Humans in Interactive Machine Learning},
+ volume = {35},
+ year = {2014}
+}
+
+% Madduri et al. (2025) introduce a computational framework for closed-loop, co-adaptive neural interfaces that models and predicts mutual user-decoder adaptation dynamics. This work offers a principled approach to bidirectional co-adaptation in real-time interactions and should be cited in the Related Work section when discussing prior closed-loop mutual adaptation frameworks.
+@article{madduri2025predictingas,
+ author = {Maneeshika M. Madduri and Momona Yamagami and Si Jia Li and Sasha N. Burckhardt and Samuel A. Burden and Amy L. Orsborn},
+ booktitle = {bioRxiv},
+ journal = {bioRxiv},
+ title = {Predicting and Shaping Human-Machine Interactions in Closed-loop, Co-adaptive Neural Interfaces},
+ year = {2025}
+}
+
+% Machine Theory of Mind (Rabinowitz et al., 2018) introduces ToMnet, a neural meta‐learning model that infers agents’ beliefs, desires, and intentions from behavioral traces. Cite this in the Methods section when describing our real‐time inference of the user’s mental model via lightweight probes and behavior logging.
+@article{rabinowitz2018machineto,
+ author = {Neil C. Rabinowitz and Frank Perbet and H. F. Song and Chiyuan Zhang and S. Eslami and M. Botvinick},
+ booktitle = {International Conference on Machine Learning},
+ journal = {ArXiv},
+ title = {Machine Theory of Mind},
+ volume = {abs/1802.07740},
+ year = {2018}
+}
+
+% Andrew Y. Ng and Stuart J. Russell (2000) 'Algorithms for Inverse Reinforcement Learning' – the foundational work formalizing IRL for inferring reward functions from expert demonstrations. Cite in the Related Work and Methods sections to ground our bidirectional user-preference modeling in classic IRL methodology.
+@inproceedings{ng2000algorithmsfi,
+ author = {Andrew Y. Ng and Stuart Russell},
+ booktitle = {International Conference on Machine Learning},
+ pages = {663-670},
+ title = {Algorithms for Inverse Reinforcement Learning},
+ volume = {67},
+ year = {2000}
+}
+
+% Chakraborti et al. (2017) 'Plan Explanations as Model Reconciliation' introduces the model reconciliation problem where AI suggests minimal changes to a user's model so that its plan appears optimal; this foundational work on bridging mismatched mental models through explanations should be cited in the Related Work section on bidirectional alignment and model reconciliation.
+@article{chakraborti2017planea,
+ author = {Tathagata Chakraborti and S. Sreedharan and Yu Zhang and S. Kambhampati},
+ booktitle = {International Joint Conference on Artificial Intelligence},
+ pages = {156-163},
+ title = {Plan Explanations as Model Reconciliation: Moving Beyond Explanation as Soliloquy},
+ year = {2017}
+}
+
+% Cite Lundberg and Lee (2017) for the SHAP framework as a complementary static explanation baseline. Include in the Methods and Experiments sections when describing model-agnostic local explanation techniques alongside LIME.
+@article{lundberg2017aua,
+ author = {Scott M. Lundberg and Su-In Lee},
+ booktitle = {Neural Information Processing Systems},
+ pages = {4765-4774},
+ title = {A Unified Approach to Interpreting Model Predictions},
+ year = {2017}
+}
+
+% Paolacci, Chandler, and Ipeirotis (2010) ‘Running Experiments on Amazon Mechanical Turk’ offers demographic data, best practices, and comparative analyses validating MTurk as a reliable platform for recruiting participants and running behavioral experiments. Cite in the Methods section when describing participant recruitment and data collection via MTurk.
+@article{paolacci2010runningeo,
+ author = {Gabriele Paolacci and Jesse J. Chandler and Panagiotis G. Ipeirotis},
+ booktitle = {Judgment and Decision Making},
+ journal = {Behavioral & Experimental Economics eJournal},
+ title = {Running Experiments on Amazon Mechanical Turk},
+ year = {2010}
+}

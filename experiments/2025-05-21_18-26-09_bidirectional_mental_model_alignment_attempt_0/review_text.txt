@@ -1,0 +1,40 @@
+{
+    "Summary": "The paper introduces CAMMA, a closed-loop framework to jointly infer a user\u2019s mental model of an AI (Q) and the AI\u2019s model of the user (P), uses Jensen\u2013Shannon divergence to define a Mutual Model Alignment Score (MMAS), and demonstrates via synthetic MLP pilots and a dropout ablation on Dbpedia14 that MMAS quickly saturates, obscuring misalignments.",
+    "Strengths": [
+        "Addresses an important problem of mutual mental\u2010model alignment in human\u2013AI collaboration.",
+        "Simple closed\u2010loop concept emphasizing bidirectional adaptation.",
+        "Highlights practical pitfall: proxy\u2010based alignment metrics can saturate."
+    ],
+    "Weaknesses": [
+        "Core metric (MMAS) is a direct application of JSD\u2014no novel theoretical insight.",
+        "Key components are underspecified: how Q(u|x) is elicited, how inverse IRL is performed, and how intervention policies are chosen.",
+        "Experiments are purely proxy\u2010based (synthetic pilots and dropout ablation) with no human subjects or real\u2010world tasks.",
+        "No baseline comparisons, ablation, or quantification of actual alignment improvements.",
+        "Paper is extremely brief; many details relegated to appendices or omitted entirely.",
+        "Lacks significance\u2014no demonstration of actual benefit in human\u2013AI settings."
+    ],
+    "Originality": 1,
+    "Quality": 1,
+    "Clarity": 2,
+    "Significance": 1,
+    "Questions": [
+        "How exactly is the user\u2019s belief distribution Q(u|x) inferred from feedback? Please specify elicitation protocols.",
+        "What inverse\u2010IRL method is used to update P(u|x)? Give algorithmic details and assumptions.",
+        "How are intervention policies designed and what is the cost tradeoff model?",
+        "Can you compare MMAS against any existing alignment or trust metrics on a standard benchmark?",
+        "What ablations or baselines demonstrate the efficacy of the closed\u2010loop over one\u2010way adaptation?"
+    ],
+    "Limitations": [
+        "No human subjects or real\u2010task evaluation\u2014results may not transfer to true human\u2013AI collaboration.",
+        "Reliance on proxy metrics that saturate; no alternative measures validated.",
+        "Underspecified methodology prevents reproduction.",
+        "Potential for misleading conclusions if MMAS used out of context."
+    ],
+    "Ethical Concerns": false,
+    "Soundness": 1,
+    "Presentation": 2,
+    "Contribution": 1,
+    "Overall": 2,
+    "Confidence": 4,
+    "Decision": "Reject"
+}

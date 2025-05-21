@@ -4,6 +4,7 @@ import re
 import json
 import backoff
 import openai
+import anthropic
 from PIL import Image
 from ai_scientist.utils.token_tracker import track_token_usage
 
@@ -12,7 +13,7 @@ MAX_NUM_TOKENS = 4096
 AVAILABLE_VLMS = [
     "claude-3-7-sonnet-20250219",
     "o4-mini-2025-04-16",
-    "gemini-2.5-pro-preview",
+    "google/gemini-2.5-pro-preview",
 ]
 
 
@@ -166,9 +167,21 @@ def get_response_from_vlm(
 
 def create_client(model: str) -> tuple[Any, str]:
     """Create client for vision-language model."""
-    if model in AVAILABLE_VLMS:
+    if "o4" in model:
         print(f"Using OpenAI API with model {model}.")
         return openai.OpenAI(), model
+    elif "gemini" in model:
+        print(f"Using OpenRouter API with {model}.")
+        return (
+            openai.OpenAI(
+                api_key=os.environ["OPENROUTER_API_KEY"],
+                base_url="https://openrouter.ai/api/v1",
+            ),
+            model,
+        )
+    elif "claude" in model:
+        print(f"Using Anthropic API with model {model}.")
+        return anthropic.Anthropic(), model
     else:
         raise ValueError(f"Model {model} not supported.")
 
