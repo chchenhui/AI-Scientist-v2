@@ -1,0 +1,35 @@
+[
+    {
+        "Name": "ephemeral_enforcements",
+        "Title": "Ephemeral Enforcements: Enabling LLMs to Adhere to Dynamically Introduced Contextual Micro-Policies",
+        "Short Hypothesis": "LLMs can dynamically recognize and adhere to natural language \"micro-policies\" (e.g., \"In this conversation, do not mention specific brand names,\" or \"For the next three turns, respond like a pirate but avoid any violent themes\") introduced within the conversational context, without requiring model retraining for each new policy. This addresses the need for fine-grained, adaptable control beyond static guardrails, crucial for trust in personalized and evolving interactions where global policies are insufficient or too restrictive. Simpler methods like prompt engineering for static policies do not adequately address dynamically changing, interaction-specific rule sets or user preferences that emerge during a conversation.",
+        "Related Work": "Current LLM safety and control mechanisms predominantly rely on: 1) Static safety filters learned during pre-training or fine-tuning (e.g., for toxicity, bias). These are global and not adaptable to specific, immediate contexts. 2) Constitutional AI or principle-based methods, where models align with a fixed set of rules, often applied during training or as a self-critique step post-generation. These constitutions are generally static and not meant for ephemeral, turn-by-turn instruction. 3) Standard prompt engineering, which can guide behavior but typically focuses on task specification rather than dynamic, overriding behavioral constraints that might change mid-interaction. 4) In-context learning, which demonstrates task adaptation based on a few examples, but its application to explicit, natural-language behavioral rule-following within a dynamic context is less explored. Our proposal distinctively focuses on the LLM's ability to interpret and comply with *ephemeral*, *dynamically introduced*, natural language micro-policies that modulate its behavior for a limited scope (e.g., current turn, specific segment of a conversation), offering a more agile control layer than existing approaches.",
+        "Abstract": "Ensuring Large Language Model (LLM) trustworthiness requires mechanisms for fine-grained behavioral control that adapt to dynamic contexts. Current approaches often rely on static guardrails or pre-defined principles, which lack the flexibility for real-time, context-specific adjustments. This proposal introduces 'Ephemeral Enforcements,' a framework investigating the capability of LLMs to recognize and adhere to 'micro-policies' \u2013 concise, natural language rules \u2013 introduced dynamically within a conversational context. We hypothesize that LLMs can, through in-context learning or lightweight adaptation, interpret these micro-policies (e.g., 'For this summary, focus only on positive aspects,' or 'Avoid using technical jargon in this explanation') and modulate their outputs accordingly without requiring retraining for each new policy. This research will explore methods for effectively communicating such policies to LLMs and evaluate their adherence across diverse scenarios. Success would enable more personalized, controllable, and trustworthy LLM interactions, particularly in applications where user preferences or situational constraints evolve rapidly. We will investigate prompt engineering techniques and potentially the efficacy of few-shot examples of policy adherence. Evaluation will focus on policy adherence, task performance, and response naturalness.",
+        "Experiments": [
+            {
+                "Name": "Micro-Policy Benchmark Creation",
+                "Description": "Develop a benchmark dataset of conversational scenarios. Each scenario will include: a base task (e.g., summarize text, answer a question), a set of dynamically introduced natural language micro-policies (e.g., 'Respond in under 50 words,' 'Use an encouraging tone,' 'Do not mention prices,' 'Explain this concept using an analogy to sports'), and criteria for successful policy adherence."
+            },
+            {
+                "Name": "In-Context Policy Communication",
+                "Description": "Investigate various prompt engineering strategies for communicating micro-policies to the LLM. This includes prepending policies to user input, using system messages, or specific formatting cues. For example: `[CURRENT POLICY: Avoid any mention of political figures.] User: What are the key challenges in urban planning?` We will also test the efficacy of providing 1-2 examples of policy-compliant interactions within the prompt (few-shot learning for policy adherence)."
+            },
+            {
+                "Name": "Evaluation of Policy Adherence",
+                "Description": "Evaluate LLM responses based on: 1. **Policy Adherence Rate:** Percentage of responses correctly following the stated micro-policy (assessed via human evaluation and, where possible, automated checks for simple policies like word count or keyword avoidance). 2. **Task Success Rate:** Whether the LLM still successfully completes the underlying task while adhering to the policy. 3. **Linguistic Quality:** Fluency, coherence, and naturalness of the policy-compliant response. 4. **Policy Generalization:** Test if the LLM can adhere to novel phrasings of previously seen policy types."
+            },
+            {
+                "Name": "Sensitivity to Policy Complexity and Conflict",
+                "Description": "(Exploratory) Assess how LLMs handle increasingly complex policies or multiple, potentially conflicting, micro-policies introduced simultaneously. For instance, 'Be concise' and 'Explain in detail'."
+            }
+        ],
+        "Risk Factors and Limitations": [
+            "LLMs might inconsistently apply or 'forget' micro-policies, especially over longer interactions or with subtle policy phrasing.",
+            "The interpretation of natural language policies can be ambiguous, leading to misapplication by the LLM.",
+            "Over-constraining the LLM with numerous or overly restrictive policies might degrade task performance or lead to overly cautious/refusal responses.",
+            "Human evaluation for nuanced policy adherence can be subjective and resource-intensive.",
+            "Ensuring policies are truly 'ephemeral' and do not unduly influence later, unrelated interactions could be challenging.",
+            "Distinguishing genuine understanding and adherence from superficial pattern matching based on keywords in the policy."
+        ]
+    }
+]
