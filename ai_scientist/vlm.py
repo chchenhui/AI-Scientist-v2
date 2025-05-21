@@ -12,6 +12,7 @@ MAX_NUM_TOKENS = 4096
 AVAILABLE_VLMS = [
     "claude-3-7-sonnet-20250219",
     "o4-mini-2025-04-16",
+    "gemini-2.5-pro-preview",
 ]
 
 
@@ -34,7 +35,7 @@ def encode_image_to_base64(image_path: str) -> str:
 
 @track_token_usage
 def make_llm_call(client, model, temperature, system_message, prompt):
-    if "gpt" in model:
+    if "gpt" in model or "claude" in model:
         return client.chat.completions.create(
             model=model,
             messages=[
@@ -47,7 +48,7 @@ def make_llm_call(client, model, temperature, system_message, prompt):
             stop=None,
             seed=0,
         )
-    elif "o1" in model or "o3" in model:
+    elif "o1" in model or "o3" in model or "o4" in model:
         return client.chat.completions.create(
             model=model,
             messages=[
@@ -64,7 +65,7 @@ def make_llm_call(client, model, temperature, system_message, prompt):
 
 @track_token_usage
 def make_vlm_call(client, model, temperature, system_message, prompt):
-    if "gpt" in model:
+    if "gpt" in model or "claude" in model:
         return client.chat.completions.create(
             model=model,
             messages=[
@@ -73,6 +74,17 @@ def make_vlm_call(client, model, temperature, system_message, prompt):
             ],
             temperature=temperature,
             max_tokens=MAX_NUM_TOKENS,
+        )
+    elif "o1" in model or "o3" in model or "o4" in model:
+        return client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "user", "content": system_message},
+                *prompt,
+            ],
+            temperature=1,
+            n=1,
+            seed=0,
         )
     else:
         raise ValueError(f"Model {model} not supported.")
@@ -154,13 +166,7 @@ def get_response_from_vlm(
 
 def create_client(model: str) -> tuple[Any, str]:
     """Create client for vision-language model."""
-    if model in [
-        "gpt-4o-2024-05-13",
-        "gpt-4o-2024-08-06",
-        "gpt-4o-2024-11-20",
-        "gpt-4o-mini-2024-07-18",
-        "o3-mini",
-    ]:
+    if model in AVAILABLE_VLMS:
         print(f"Using OpenAI API with model {model}.")
         return openai.OpenAI(), model
     else:
@@ -233,13 +239,7 @@ def get_batch_responses_from_vlm(
     if msg_history is None:
         msg_history = []
 
-    if model in [
-        "gpt-4o-2024-05-13",
-        "gpt-4o-2024-08-06",
-        "gpt-4o-2024-11-20",
-        "gpt-4o-mini-2024-07-18",
-        "o3-mini",
-    ]:
+    if model in AVAILABLE_VLMS:
         # Convert single image path to list
         if isinstance(image_paths, str):
             image_paths = [image_paths]

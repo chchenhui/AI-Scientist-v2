@@ -34,7 +34,7 @@ def query(
 
     # Handle models with beta limitations
     # ref: https://platform.openai.com/docs/guides/reasoning/beta-limitations
-    if model.startswith("o1"):
+    if model.startswith("o1") or model.startswith("o4"):
         if system_message and user_message is None:
             user_message = system_message
         elif system_message is None and user_message:

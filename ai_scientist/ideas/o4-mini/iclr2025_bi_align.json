@@ -1,0 +1,44 @@
+[
+    {
+        "Name": "bidirectional_mental_model_alignment",
+        "Title": "Aligning Minds: Co-Adaptive Mental Model Alignment for Human\u2013AI Collaboration",
+        "Short Hypothesis": "A dynamic, co-adaptive loop that infers and corrects both the user\u2019s mental model of the AI and the AI\u2019s model of the user in real time will improve collaboration, increase trust, and reduce task errors compared to static one-way alignment methods.",
+        "Related Work": "Prior work in HCI and ML has studied user mental models (Miller et al., 2017) and personalized AI explanations (Kulesza et al., 2015), and separately learned user preferences via inverse reinforcement learning. However, existing methods largely focus on a single direction\u2014either adapting explanations to a fixed user model or adapting AI behavior to human feedback. We propose a tightly coupled, bidirectional adaptation mechanism that explicitly models both sides' beliefs and updates them iteratively. This goes beyond trivial extensions by introducing a closed-loop calibration metric and intervention policy that has not been studied in prior literature.",
+        "Abstract": "As AI systems become more deeply embedded in collaborative tasks, a mismatch between a user\u2019s mental model of the AI and the AI\u2019s model of the user can lead to poor performance, decreased trust, and misuse. We propose a novel bidirectional alignment framework: Co-Adaptive Mental Model Alignment (CAMMA). Our approach alternates between two coupled processes during interaction. First, the system infers the user's mental model\u2014i.e., their beliefs about the AI's capabilities and decision criteria\u2014via lightweight probes and behavior logging. Second, it updates its own user model, estimating the user's goals and expertise from their responses. Based on a calibrated alignment score between these two models, CAMMA dynamically adjusts both its explanatory outputs (e.g., tailored feature highlights or natural\u2010language rationales) and solicits targeted user feedback to correct misconceptions. We hypothesize that this iterative loop fosters deeper mutual understanding, leading to higher task accuracy, faster decision-making, and more calibrated trust. We will validate CAMMA in a collaborative text classification setting with crowd\u2010workers and domain experts, comparing against static explanation baselines and unidirectional adaptation. Metrics include alignment score reduction, task performance, trustworthiness scales, and interaction overhead. Our work contributes a generalizable architecture and evaluation suite for bidirectional human\u2013AI alignment, opening a new direction in AI interpretability and user-adaptive systems.",
+        "Experiments": [
+            {
+                "Name": "Model Calibration Study",
+                "Description": "Assess baseline discrepancies between the user\u2019s mental model and AI\u2019s model of the user. Participants perform a classification task with static explanations. We collect questionnaires and interaction logs to measure initial alignment score.",
+                "Metrics": [
+                    "alignment score (KL-divergence between model distributions)",
+                    "self-reported understanding (Likert)"
+                ]
+            },
+            {
+                "Name": "Co-Adaptive vs Unidirectional",
+                "Description": "Implement CAMMA and compare to (a) static explanations, (b) explanations adapting only to fixed user model, and (c) system adapting only to user feedback. Evaluate on the same classification task over multiple rounds.",
+                "Metrics": [
+                    "task accuracy",
+                    "time to decision",
+                    "trust scale",
+                    "alignment drift over sessions"
+                ]
+            },
+            {
+                "Name": "Ablation of Intervention Policies",
+                "Description": "Test variants of the bidirectional loop by removing either explanation adaptation or user-model updates to isolate the benefit of each component.",
+                "Metrics": [
+                    "performance drop (%)",
+                    "trust variance",
+                    "user satisfaction"
+                ]
+            }
+        ],
+        "Risk Factors and Limitations": [
+            "Inferring user mental models accurately may require intrusive probes that disrupt natural interaction.",
+            "The complexity of real-time updates could introduce latency affecting usability.",
+            "Results from controlled lab settings may not generalize to high-stakes or domain-expert tasks without further study.",
+            "Quantifying alignment via proxy metrics (e.g., KL-divergence) may miss qualitative aspects of trust and understanding."
+        ]
+    }
+]

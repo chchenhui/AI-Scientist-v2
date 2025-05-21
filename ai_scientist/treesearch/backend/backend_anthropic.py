@@ -37,9 +37,11 @@ def query(
         filtered_kwargs["max_tokens"] = 8192  # default for Claude models
 
     if func_spec is not None:
-        raise NotImplementedError(
-            "Anthropic does not support function calling for now."
-        )
+        filtered_kwargs["tools"] = [func_spec.as_anthropic_tool_dict]
+        filtered_kwargs["tool_choice"] = func_spec.anthropic_tool_choice_dict
+        # raise NotImplementedError(
+        #     "Anthropic does not support function calling for now."
+        # )
 
     # Anthropic doesn't allow not having a user messages
     # if we only have system msg -> use it as user msg
