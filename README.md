@@ -58,6 +58,15 @@ conda install conda-forge::chktex
 pip install -r requirements.txt
 ```
 
+Install ```pdflatex``` toolkit:
+
+```bash
+sudo apt install texlive-latex-base
+sudo apt-get install texlive-fonts-recommended
+sudo apt-get install texlive-fonts-extra
+sudo apt-get install texlive-latex-extra
+```
+
 ### Supported Models and API Keys
 
 #### OpenAI Models
