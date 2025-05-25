@@ -8,7 +8,7 @@ import anthropic
 from PIL import Image
 from ai_scientist.utils.token_tracker import track_token_usage
 
-MAX_NUM_TOKENS = 4096
+MAX_NUM_TOKENS = 8192
 
 AVAILABLE_VLMS = [
     "claude-3-7-sonnet-20250219",
