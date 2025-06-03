@@ -1,5 +1,5 @@
 python launch_scientist_bfts.py \
- --load_ideas "ai_scientist/ideas/o4-mini/iclr2025_wsl.json" \
+ --load_ideas "ai_scientist/ideas/o4-mini/iclr2025_scope.json" \
  --model_writeup o4-mini-2025-04-16 \
  --model_citation o4-mini-2025-04-16 \
  --skip_review \

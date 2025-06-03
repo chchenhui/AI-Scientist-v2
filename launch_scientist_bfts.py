@@ -284,7 +284,7 @@ if __name__ == "__main__":
                     base_folder=idea_dir,
                     big_model=args.model_writeup,
                     small_model=args.model_writeup,
-                    page_limit=4,
+                    page_limit=9,
                     citations_text=citations_text,
                 )
             if writeup_success:
