@@ -19,25 +19,5 @@
             "Clarification questions may themselves be ambiguous or misunderstood, leading to dialog loops.",
             "Method focuses on entity ambiguity and may not address all hallucination sources (e.g., commonsense errors)."
         ]
-    },
-    {
-        "Name": "clarify2retrieve",
-        "Title": "Clarify2Retrieve: On-Demand Query Clarification for Reliable Retrieval-Augmented LLMs",
-        "Short Hypothesis": "We hypothesize that an explicit, interactive clarification step\u2014triggered when a retrieval-augmented LLM detects high uncertainty in user queries\u2014will reduce hallucinations and improve answer accuracy more effectively than one-shot retrieval, without requiring costly model fine-tuning or heavy pipelines. This setting cleanly isolates the role of ambiguity resolution, and no simpler static method can disambiguate content at inference time.",
-        "Related Work": "Retrieval-Augmented Generation (RAG) methods (Lewis et al., 2020) and uncertainty-driven retrieval frameworks (e.g., SUGAR, Zubkova et al., 2025) use model confidence to gate or weight retrieval, but remain non-interactive. Question clarification has been studied in information retrieval (Culpepper et al., 2019) and conversational QA (QuCumber, 2021), yet not combined with uncertainty to drive downstream retrieval for LLMs. Our proposal uniquely adds a lightweight clarification dialogue\u2014prompted by per-token uncertainty proxies\u2014to focus retrieval on disambiguated queries, distinguishing it from prior static or non-uncertainty-based clarification systems.",
-        "Abstract": "As retrieval-augmented language models (RAG) become central to knowledge-intensive applications, query ambiguity often leads to hallucinations and diminished user trust. Prior work employs uncertainty to gate retrieval calls or weight evidence, yet overlooks a simple insight: humans naturally ask clarifying questions to resolve ambiguity. We introduce Clarify2Retrieve, an interactive framework where an LLM first estimates query uncertainty\u2014via low-overhead proxies such as log-probs or temperature-based entropy\u2014identifies ambiguous spans, and generates concise follow-up questions. Only after user clarification does the system invoke retrieval and generate a final answer. This two-step approach reduces irrelevant retrievals, focuses evidence gathering, and sharply cuts hallucinations. We implement Clarify2Retrieve with GPT-3.5 prompts and compare against static RAG and SUGAR baselines on ambiguity-augmented QA benchmarks. Our evaluation measures exact match accuracy, retrieval precision@k, and user trust ratings. Results show up to 6% absolute accuracy gains, 25% fewer irrelevant retrievals, and significantly higher trust scores in a human-in-the-loop study. Clarify2Retrieve is training-free, parameter-efficient, and easily integrates with existing RAG pipelines, offering a practical path to more trustworthy LLM applications.",
-        "Experiments": [
-            "1. Ambiguity Detection Quality: Collect or generate QA pairs with known ambiguous entities (e.g., 'Paris', 'Mercury') from AmbigQA. Use GPT-3.5 logits or token entropy to rank tokens by uncertainty; measure overlap with ground-truth ambiguous spans (precision/recall).",
-            "2. Retrieval Accuracy & Hallucination Reduction: Implement Clarify2Retrieve with a fixed uncertainty threshold to trigger one clarification. Simulate user responses using metadata. Compare RAG, SUGAR, and Clarify2Retrieve on NaturalQuestions-ambig and AmbigQA. Evaluate exact match, F1, and hallucination rate (manually annotated).",
-            "3. Human-in-the-Loop Trust Study: Recruit 40 crowdworkers to pose ambiguous queries and interact with the three systems. Measure perceived trust, answer satisfaction (Likert scales), number of clarification turns, and task completion time.",
-            "4. Ablation & Cost Analysis: Vary the uncertainty threshold and maximum clarification turns (0\u20133) to analyze trade-offs between latency (API calls), accuracy, and user burden. Report curves of accuracy vs. average clarification count."
-        ],
-        "Risk Factors and Limitations": [
-            "Interactive clarifications introduce additional latency and may burden users in time-sensitive applications.",
-            "Simulated user responses in offline experiments may not capture real user behavior or misunderstanding.",
-            "Simple uncertainty proxies (log-probs, entropy) may misidentify ambiguity, leading to unnecessary clarifications.",
-            "Clarification questions themselves could introduce new ambiguity or fail to resolve the user\u2019s intent.",
-            "Focuses on entity and phrase ambiguity; may not address deeper commonsense or reasoning-based hallucinations."
-        ]
     }
 ]
