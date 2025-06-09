@@ -1,0 +1,56 @@
+This is BibTeX, Version 0.99d (TeX Live 2022/dev/Debian)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: template.aux
+The style file: iclr2025.bst
+Database file #1: references.bib
+Warning--empty journal in goodfellow2014explainingah
+Warning--empty journal in gretton2012akt
+Warning--empty journal in heusel2017ganstb
+Warning--empty journal in karras2019analyzingai
+Warning--empty journal in lakshminarayanan2016simpleas
+Warning--empty journal in radford2019languagema
+Warning--empty journal in recht2019doic
+Warning--empty journal in wang2018glueam
+Warning--empty journal in wang2019superglueas
+You've used 10 entries,
+            2773 wiz_defined-function locations,
+            647 strings with 6873 characters,
+and the built_in function-call counts, 6357 in all, are:
+= -- 548
+> -- 480
+< -- 5
++ -- 160
+- -- 150
+* -- 543
+:= -- 959
+add.period$ -- 30
+call.type$ -- 10
+change.case$ -- 80
+chr.to.int$ -- 10
+cite$ -- 29
+duplicate$ -- 260
+empty$ -- 412
+format.name$ -- 160
+if$ -- 1326
+int.to.chr$ -- 1
+int.to.str$ -- 1
+missing$ -- 10
+newline$ -- 58
+num.names$ -- 40
+pop$ -- 172
+preamble$ -- 1
+purify$ -- 70
+quote$ -- 0
+skip$ -- 244
+stack$ -- 0
+substring$ -- 246
+swap$ -- 54
+text.length$ -- 5
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 110
+warning$ -- 9
+while$ -- 48
+width$ -- 0
+write$ -- 126
+(There were 9 warnings)

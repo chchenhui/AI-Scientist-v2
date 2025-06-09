@@ -1,0 +1,50 @@
+\begin{thebibliography}{7}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Arjovsky et~al.(2019)Arjovsky, Bottou, Gulrajani, and
+  Lopez-Paz]{arjovsky2019invariantrm}
+Mart{\'i}n Arjovsky, L.~Bottou, Ishaan Gulrajani, and David Lopez-Paz.
+\newblock Invariant risk minimization.
+\newblock \emph{ArXiv}, abs/1907.02893, 2019.
+
+\bibitem[Koh \& Liang(2017)Koh and Liang]{koh2017understandingbp}
+Pang~Wei Koh and Percy Liang.
+\newblock Understanding black-box predictions via influence functions.
+\newblock pp.\  1885--1894, 2017.
+
+\bibitem[Liu et~al.(2021)Liu, Haghgoo, Chen, Raghunathan, Koh, Sagawa, Liang,
+  and Finn]{liu2021justtt}
+E.~Liu, Behzad Haghgoo, Annie~S. Chen, Aditi Raghunathan, Pang~Wei Koh, Shiori
+  Sagawa, Percy Liang, and Chelsea Finn.
+\newblock Just train twice: Improving group robustness without training group
+  information.
+\newblock \emph{ArXiv}, abs/2107.09044, 2021.
+
+\bibitem[Liu et~al.(2014)Liu, Luo, Wang, and Tang]{liu2014deeplf}
+Ziwei Liu, Ping Luo, Xiaogang Wang, and Xiaoou Tang.
+\newblock Deep learning face attributes in the wild.
+\newblock \emph{2015 IEEE International Conference on Computer Vision (ICCV)},
+  pp.\  3730--3738, 2014.
+
+\bibitem[Ren et~al.(2018)Ren, Zeng, Yang, and Urtasun]{ren2018learningtr}
+Mengye Ren, Wenyuan Zeng, Binh Yang, and R.~Urtasun.
+\newblock Learning to reweight examples for robust deep learning.
+\newblock pp.\  4331--4340, 2018.
+
+\bibitem[Sagawa et~al.(2020)Sagawa, Koh, Hashimoto, and
+  Liang]{sagawa2020distributionallyrn}
+Shiori Sagawa, Pang~Wei Koh, Tatsunori~B. Hashimoto, and Percy Liang.
+\newblock Distributionally robust neural networks.
+\newblock 2020.
+
+\bibitem[Wah et~al.(2011)Wah, Branson, Welinder, Perona, and
+  Belongie]{wah2011thecb}
+C.~Wah, Steve Branson, P.~Welinder, P.~Perona, and Serge~J. Belongie.
+\newblock The caltech-ucsd birds-200-2011 dataset.
+\newblock 2011.
+
+\end{thebibliography}

@@ -1,0 +1,96 @@
+\begin{thebibliography}{11}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Chen et~al.(2021)Chen, Tworek, Jun, Yuan, Pond{\'e}, Kaplan, Edwards,
+  Burda, Joseph, Brockman, Ray, Puri, Krueger, Petrov, Khlaaf, Sastry, Mishkin,
+  Chan, Gray, Ryder, Pavlov, Power, Kaiser, Bavarian, Winter, Tillet, Such,
+  Cummings, Plappert, Chantzis, Barnes, Herbert-Voss, Guss, Nichol, Babuschkin,
+  Balaji, Jain, Carr, Leike, Achiam, Misra, Morikawa, Radford, Knight,
+  Brundage, Murati, Mayer, Welinder, McGrew, Amodei, McCandlish, Sutskever, and
+  Zaremba]{chen2021evaluatingll}
+Mark Chen, Jerry Tworek, Heewoo Jun, Qiming Yuan, Henrique Pond{\'e}, Jared
+  Kaplan, Harrison Edwards, Yura Burda, Nicholas Joseph, Greg Brockman, Alex
+  Ray, Raul Puri, Gretchen Krueger, Michael Petrov, Heidy Khlaaf, Girish
+  Sastry, Pamela Mishkin, Brooke Chan, Scott Gray, Nick Ryder, Mikhail Pavlov,
+  Alethea Power, Lukasz Kaiser, Mo~Bavarian, Clemens Winter, Phil Tillet,
+  F.~Such, D.~Cummings, Matthias Plappert, Fotios Chantzis, Elizabeth Barnes,
+  Ariel Herbert-Voss, William~H. Guss, Alex Nichol, Igor Babuschkin, S.~Balaji,
+  Shantanu Jain, A.~Carr, Jan Leike, Josh Achiam, Vedant Misra, Evan Morikawa,
+  Alec Radford, M.~Knight, Miles Brundage, Mira Murati, Katie Mayer,
+  P.~Welinder, Bob McGrew, Dario Amodei, Sam McCandlish, I.~Sutskever, and
+  Wojciech Zaremba.
+\newblock Evaluating large language models trained on code.
+\newblock \emph{ArXiv}, abs/2107.03374, 2021.
+
+\bibitem[Goodfellow et~al.(2016)Goodfellow, Bengio, Courville, and
+  Bengio]{goodfellow2016deep}
+Ian Goodfellow, Yoshua Bengio, Aaron Courville, and Yoshua Bengio.
+\newblock \emph{Deep learning}, volume~1.
+\newblock MIT Press, 2016.
+
+\bibitem[Lakshminarayanan et~al.(2016)Lakshminarayanan, Pritzel, and
+  Blundell]{lakshminarayanan2016simpleas}
+Balaji Lakshminarayanan, A.~Pritzel, and C.~Blundell.
+\newblock Simple and scalable predictive uncertainty estimation using deep
+  ensembles.
+\newblock pp.\  6402--6413, 2016.
+
+\bibitem[Levenshtein(1965)]{levenshtein1965binarycc}
+V.~Levenshtein.
+\newblock Binary codes capable of correcting deletions, insertions, and
+  reversals.
+\newblock \emph{Soviet physics. Doklady}, 10:\penalty0 707--710, 1965.
+
+\bibitem[Lin et~al.(2014)Lin, Maire, Belongie, Hays, Perona, Ramanan,
+  Doll{\'a}r, and Zitnick]{lin2014microsoftcc}
+Tsung-Yi Lin, M.~Maire, Serge~J. Belongie, James Hays, P.~Perona, Deva Ramanan,
+  Piotr Doll{\'a}r, and C.~L. Zitnick.
+\newblock Microsoft coco: Common objects in context.
+\newblock pp.\  740--755, 2014.
+
+\bibitem[Reimers \& Gurevych(2019)Reimers and
+  Gurevych]{reimers2019sentencebertse}
+Nils Reimers and Iryna Gurevych.
+\newblock Sentence-bert: Sentence embeddings using siamese bert-networks.
+\newblock pp.\  3980--3990, 2019.
+
+\bibitem[Sennrich et~al.(2015)Sennrich, Haddow, and
+  Birch]{sennrich2015improvingnm}
+Rico Sennrich, B.~Haddow, and Alexandra Birch.
+\newblock Improving neural machine translation models with monolingual data.
+\newblock \emph{ArXiv}, abs/1511.06709, 2015.
+
+\bibitem[Wang et~al.(2024)Wang, Zhang, Chen, Li, Luo, Han, Wang, Li, Gao, and
+  Hu]{wang2024ubenchbu}
+Xunzhi Wang, Zhuowei Zhang, Gaonan Chen, Qiongyu Li, Bitong Luo, Zhixin Han,
+  Haotian Wang, Zhiyu Li, Hang Gao, and Mengting Hu.
+\newblock Ubench: Benchmarking uncertainty in large language models with
+  multiple choice questions.
+\newblock 2024.
+
+\bibitem[Wei et~al.(2022)Wei, Wang, Schuurmans, Bosma, Chi, Xia, Le, and
+  Zhou]{wei2022chainot}
+Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Ed~H. Chi, F.~Xia, Quoc
+  Le, and Denny Zhou.
+\newblock Chain of thought prompting elicits reasoning in large language
+  models.
+\newblock \emph{ArXiv}, abs/2201.11903, 2022.
+
+\bibitem[Ye et~al.(2024)Ye, Yang, Pang, Wang, Wong, Yilmaz, Shi, and
+  Tu]{ye2024benchmarkinglv}
+Fanghua Ye, Mingming Yang, Jianhui Pang, Longyue Wang, Derek~F. Wong, Emine
+  Yilmaz, Shuming Shi, and Zhaopeng Tu.
+\newblock Benchmarking llms via uncertainty quantification.
+\newblock \emph{ArXiv}, abs/2401.12794, 2024.
+
+\bibitem[Zhang et~al.(2019)Zhang, Zhao, Saleh, and Liu]{zhang2019pegasuspw}
+Jingqing Zhang, Yao Zhao, Mohammad Saleh, and Peter~J. Liu.
+\newblock Pegasus: Pre-training with extracted gap-sentences for abstractive
+  summarization.
+\newblock \emph{ArXiv}, abs/1912.08777, 2019.
+
+\end{thebibliography}

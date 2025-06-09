@@ -1,0 +1,161 @@
+
+% M. Aharon, M. Elad, and A. Bruckstein. “K‐SVD: An Algorithm for Designing Overcomplete Dictionaries for Sparse Representation.” IEEE Transactions on Signal Processing, 2006. Cite this foundational dictionary learning method in the Methods section when describing K‐SVD for learning weight primitives.
+@article{aharon2006rmka,
+ author = {M. Aharon and Michael Elad and A. Bruckstein},
+ booktitle = {IEEE Transactions on Signal Processing},
+ journal = {IEEE Transactions on Signal Processing},
+ pages = {4311-4322},
+ title = {$rm K$-SVD: An Algorithm for Designing Overcomplete Dictionaries for Sparse Representation},
+ volume = {54},
+ year = {2006}
+}
+
+% Mitchell Wortsman et al., "Model soups: averaging weights of multiple fine-tuned models improves accuracy without increasing inference time" (ICML 2022). This work shows how averaging the full weights of multiple fine-tuned models can improve accuracy and robustness without extra inference cost. Cite in the Related Work section when contrasting weight merging methods with our sparse factorization approach.
+@article{wortsman2022modelsa,
+ author = {Mitchell Wortsman and Gabriel Ilharco and S. Gadre and R. Roelofs and Raphael Gontijo-Lopes and Ari S. Morcos and Hongseok Namkoong and Ali Farhadi and Y. Carmon and Simon Kornblith and Ludwig Schmidt},
+ booktitle = {International Conference on Machine Learning},
+ journal = {ArXiv},
+ title = {Model soups: averaging weights of multiple fine-tuned models improves accuracy without increasing inference time},
+ volume = {abs/2203.05482},
+ year = {2022}
+}
+
+% B. Olshausen and D. Field (1997) introduced sparse coding with an overcomplete basis in Vision Research, providing the foundational ℓ₁ sparsity formulation used when describing our sparse coding method for weight primitives.
+@article{olshausen1997sparsecw,
+ author = {B. Olshausen and D. Field},
+ booktitle = {Vision Research},
+ journal = {Vision Research},
+ pages = {3311-3325},
+ title = {Sparse coding with an overcomplete basis set: A strategy employed by V1?},
+ volume = {37},
+ year = {1997}
+}
+
+% Cite A. Krizhevsky’s technical report introducing the CIFAR-10 and CIFAR-100 datasets in the Experiments section when describing the datasets used.
+@inproceedings{krizhevsky2009learningml,
+ author = {A. Krizhevsky},
+ title = {Learning Multiple Layers of Features from Tiny Images},
+ year = {2009}
+}
+
+% Kingma and Ba (2014) introduce Adam: A Method for Stochastic Optimization. Cite in the Experiments/Methods section when detailing the optimizer and hyperparameter choices.
+@article{kingma2014adamam,
+ author = {Diederik P. Kingma and Jimmy Ba},
+ booktitle = {International Conference on Learning Representations},
+ journal = {CoRR},
+ title = {Adam: A Method for Stochastic Optimization},
+ volume = {abs/1412.6980},
+ year = {2014}
+}
+
+% Ha et al. (2016) introduce HyperNetworks, networks that generate weights for another network, applied to recurrent models. Cite in Related Work when discussing prior meta-learning and hypernetwork approaches for predicting model weights.
+@article{ha2016hypernetworks,
+ author = {David Ha and Andrew M. Dai and Quoc V. Le},
+ booktitle = {International Conference on Learning Representations},
+ journal = {ArXiv},
+ title = {HyperNetworks},
+ volume = {abs/1609.09106},
+ year = {2016}
+}
+
+% Cite Garipov et al. (2018) “Loss Surfaces, Mode Connectivity, and Fast Ensembling of DNNs” when discussing smooth interpolation between models and the geometric structure of weight space uncovered by sparse combinations.
+@article{garipov2018losssm,
+ author = {T. Garipov and Pavel Izmailov and Dmitrii Podoprikhin and D. Vetrov and A. Wilson},
+ booktitle = {Neural Information Processing Systems},
+ journal = {ArXiv},
+ title = {Loss Surfaces, Mode Connectivity, and Fast Ensembling of DNNs},
+ volume = {abs/1802.10026},
+ year = {2018}
+}
+
+% Cite Mairal et al. (2009) “Online Learning for Matrix Factorization and Sparse Coding” as the foundational scalable online dictionary learning algorithm used in our Methods section for efficient sparse coding of high-dimensional weight vectors.
+@article{mairal2009onlinelf,
+ author = {J. Mairal and F. Bach and J. Ponce and G. Sapiro},
+ booktitle = {Journal of machine learning research},
+ journal = {J. Mach. Learn. Res.},
+ pages = {19-60},
+ title = {Online Learning for Matrix Factorization and Sparse Coding},
+ volume = {11},
+ year = {2009}
+}
+
+% Finn et al. (2017) introduce Model-Agnostic Meta-Learning (MAML), a gradient-based meta-learning algorithm that learns an initialization enabling fast adaptation with few gradient steps. Cite in the Experiments section when comparing rapid fine-tuning from sparse weight primitive initializations against learned meta-learning initializations.
+@article{finn2017modelagnosticmf,
+ author = {Chelsea Finn and P. Abbeel and S. Levine},
+ booktitle = {International Conference on Machine Learning},
+ pages = {1126-1135},
+ title = {Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks},
+ year = {2017}
+}
+
+% Kaiming He et al. (2015) introduced Deep Residual Learning for Image Recognition, the foundational paper for ResNet architectures (including ResNet-18). Cite in the Experiments section when describing the model zoo and the use of ResNet-18 on CIFAR benchmarks.
+@article{he2015deeprl,
+ author = {Kaiming He and X. Zhang and Shaoqing Ren and Jian Sun},
+ booktitle = {Computer Vision and Pattern Recognition},
+ journal = {2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+ pages = {770-778},
+ title = {Deep Residual Learning for Image Recognition},
+ year = {2015}
+}
+
+% Gregor and LeCun (2010) introduce Learned ISTA (LISTA), a trainable feed-forward network that approximates sparse coding with an ℓ₁ penalty. Cite in the Methods section to support our use of a trainable autoencoder with ℓ₁ sparsity for fast sparse coding of weight vectors.
+@article{gregor2010learningfa,
+ author = {Karol Gregor and Yann LeCun},
+ booktitle = {International Conference on Machine Learning},
+ pages = {399-406},
+ title = {Learning Fast Approximations of Sparse Coding},
+ year = {2010}
+}
+
+% Yuval Netzer et al. (2011) introduce the Street View House Numbers (SVHN) dataset. Cite this paper in the Experiments section when describing few-shot transfer from CIFAR-10 to SVHN.
+@inproceedings{netzer2011readingdi,
+ author = {Yuval Netzer and Tao Wang and Adam Coates and A. Bissacco and Bo Wu and A. Ng},
+ title = {Reading Digits in Natural Images with Unsupervised Feature Learning},
+ year = {2011}
+}
+
+% Yuanhe Zhang et al. (2025) “LoRA-One: One-Step Full Gradient Could Suffice for Fine-Tuning Large Language Models, Provably and Efficiently.” This paper extends Hu et al.’s LoRA by offering theoretical analysis and initialization strategies for low-rank weight adaptation. Cite in Related Work when discussing alternative compact weight factorization and adaptation methods.
+@inproceedings{zhang2025loraoneof,
+ author = {Yuanhe Zhang and Fanghui Liu and Yudong Chen},
+ title = {LoRA-One: One-Step Full Gradient Could Suffice for Fine-Tuning Large Language Models, Provably and Efficiently},
+ year = {2025}
+}
+
+% K. Simonyan and A. Zisserman (2014) introduced the VGG family of very deep convolutional networks with 16–19 layers and small (3×3) filters, achieving top results in ILSVRC14. Cite in the Experiments section when describing the use of VGG variants in the model zoo.
+@article{simonyan2014verydc,
+ author = {K. Simonyan and Andrew Zisserman},
+ booktitle = {International Conference on Learning Representations},
+ journal = {CoRR},
+ title = {Very Deep Convolutional Networks for Large-Scale Image Recognition},
+ volume = {abs/1409.1556},
+ year = {2014}
+}
+
+% Pavel Izmailov et al. (2018) introduce Stochastic Weight Averaging (SWA), demonstrating that simple averaging of SGD iterates yields flatter solutions and improved generalization. Cite in the Related Work section when discussing weight-space averaging and its role as a baseline for interpolation and model merging techniques.
+@article{izmailov2018averagingwl,
+ author = {Pavel Izmailov and Dmitrii Podoprikhin and T. Garipov and D. Vetrov and A. Wilson},
+ booktitle = {Conference on Uncertainty in Artificial Intelligence},
+ pages = {876-885},
+ title = {Averaging Weights Leads to Wider Optima and Better Generalization},
+ year = {2018}
+}
+
+% Hu et al. (2021) introduce LoRA: Low-Rank Adaptation of Large Language Models, which freezes pre-trained model weights and injects trainable low-rank decomposition matrices for efficient task adaptation. Cite in the Related Work section when discussing compact weight factorization and parameter-efficient adaptation baselines.
+@article{hu2021lorala,
+ author = {J. E. Hu and Yelong Shen and Phillip Wallis and Zeyuan Allen-Zhu and Yuanzhi Li and Shean Wang and Weizhu Chen},
+ booktitle = {International Conference on Learning Representations},
+ journal = {ArXiv},
+ title = {LoRA: Low-Rank Adaptation of Large Language Models},
+ volume = {abs/2106.09685},
+ year = {2021}
+}
+
+% Cite Li et al. (2017) ‘Visualizing the Loss Landscape of Neural Nets’ in the Related Work section to support the assumption of low-dimensional structure in neural network weight spaces, motivating our use of compact dictionary representations.
+@article{li2017visualizingtl,
+ author = {Hao Li and Zheng Xu and Gavin Taylor and T. Goldstein},
+ booktitle = {Neural Information Processing Systems},
+ journal = {ArXiv},
+ title = {Visualizing the Loss Landscape of Neural Nets},
+ volume = {abs/1712.09913},
+ year = {2017}
+}

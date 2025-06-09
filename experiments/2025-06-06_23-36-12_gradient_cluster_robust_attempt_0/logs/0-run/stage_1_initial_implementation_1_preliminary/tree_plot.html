@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Check if we're running under Live Server
+      if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+          let lastModified = '';
+
+          // Check for file changes every second
+          setInterval(async () => {
+              try {
+                  const response = await fetch(window.location.href, { method: 'HEAD' });
+                  // get a timestamp that shows when the file was last changed
+                  const currentModified = response.headers.get('last-modified');
+
+                  if (lastModified && lastModified !== currentModified) {
+                      window.location.reload();
+                  }
+
+                  lastModified = currentModified;
+              } catch (e) {
+                  console.error('Error checking for updates:', e);
+              }
+          }, 1000);
+      }
+  </script>
+    <script
+      id="p5scripttag"
+      src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"
+      integrity="sha512-uaz5GpnQoE6t5echKlX8P52czvsIGgLPcvlzfvRubLZ1Hp8JemUDnbUiAahbVtPb+jUVrNETuXvAhDDF/N3M4w=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+
+    <script>
+      const bgCol = "#FFFFFF";
+const accentCol = "#1a439e";
+
+hljs.initHighlightingOnLoad();
+
+// Function to update background color globally
+function updateBackgroundColor(color) {
+  // Update the JS variable
+  window.bgColCurrent = color;
+
+  // Update body background
+  document.body.style.backgroundColor = color;
+
+  // Update canvas container background
+  const canvasContainer = document.getElementById('canvas-container');
+  if (canvasContainer) {
+    canvasContainer.style.backgroundColor = color;
+  }
+}
+
+// Store tree data for each stage
+const stageData = {
+  Stage_1: null,
+  Stage_2: null,
+  Stage_3: null,
+  Stage_4: null
+};
+
+// Keep track of current selected stage
+let currentStage = null;
+let currentSketch = null;
+let availableStages = [];
+
+// Class definitions for nodes and edges
+class Node {
+  constructor(x, y, id, isRoot = false) {
+    this.x = x;
+    this.y = y;
+    this.id = id;
+    this.visible = isRoot; // Only root nodes are visible initially
+    this.appearProgress = 0;
+    this.popEffect = 0;
+    this.selected = false;
+    this.isRootNode = isRoot;
+  }
+
+  update() {
+    if (this.visible) {
+      // Handle the main appearance animation
+      if (this.appearProgress < 1) {
+        this.appearProgress += 0.06;
+
+        // When we reach full size, trigger the pop effect
+        if (this.appearProgress >= 1) {
+          this.appearProgress = 1; // Cap at 1
+          this.popEffect = 1; // Start the pop effect
+        }
+      }
+
+      // Handle the pop effect animation
+      if (this.popEffect > 0) {
+        this.popEffect -= 0.15; // Control how quickly it shrinks back
+        if (this.popEffect < 0) this.popEffect = 0; // Don't go negative
+      }
+    }
+  }
+
+  startAnimation() {
+    this.visible = true;
+  }
+
+  color() {
+    if (this.selected) {
+      return accentCol; // Use the global accent color variable for selected node
+    }
+    return '#4263eb'; // Default blue color
+  }
+
+  render(p5) {
+    if (this.visible) {
+      const popBonus = this.popEffect * 0.1;
+      const nodeScale = p5.map(this.appearProgress, 0, 1, 0, 1) + popBonus;
+      const alpha = p5.map(this.appearProgress, 0, 1, 0, 255);
+
+      p5.push();
+      p5.translate(this.x, this.y);
+
+      // Shadow effect
+      p5.noStroke();
+      p5.rectMode(p5.CENTER);
+
+      for (let i = 1; i <= 4; i++) {
+        p5.fill(0, 0, 0, alpha * 0.06);
+        p5.rect(i, i, 30 * nodeScale, 30 * nodeScale, 10);
+      }
+
+      // Main square - use node's color with alpha
+      let nodeColor = p5.color(this.color());
+      nodeColor.setAlpha(alpha);
+      p5.fill(nodeColor);
+      p5.rect(0, 0, 30 * nodeScale, 30 * nodeScale, 10);
+
+      // Draw checkmark icon if the node is selected
+      if (this.selected && this.appearProgress >= 1) {
+        p5.stroke(255);
+        p5.strokeWeight(2 * nodeScale);
+        p5.noFill();
+        // Draw checkmark
+        p5.beginShape();
+        p5.vertex(-8, 0);
+        p5.vertex(-3, 5);
+        p5.vertex(8, -6);
+        p5.endShape();
+      }
+
+      p5.pop();
+    }
+  }
+
+  isMouseOver(p5) {
+    return this.visible &&
+           p5.mouseX > this.x - 15 &&
+           p5.mouseX < this.x + 15 &&
+           p5.mouseY > this.y - 15 &&
+           p5.mouseY < this.y + 15;
+  }
+
+  // Connect this node to a child node
+  child(childNode) {
+    // Create an edge from this node to the child
+    let isLeft = childNode.x < this.x;
+    let isRight = childNode.x > this.x;
+    let edge = new Edge(this, childNode, isLeft, isRight);
+    return edge;
+  }
+}
+
+class Edge {
+  constructor(parent, child, isLeft, isRight) {
+    this.parent = parent;
+    this.child = child;
+    this.isLeft = isLeft;
+    this.isRight = isRight;
+    this.progress = 0;
+
+    // Calculate the midpoint where branching occurs
+    this.midY = parent.y + (child.y - parent.y) * 0.6;
+
+    // Use the actual child x-coordinate
+    // This ensures the edge will connect directly to the child node
+    this.branchX = child.x;
+  }
+
+  update() {
+    if (this.parent.visible && this.progress < 1) {
+      this.progress += 0.01; // Adjust animation speed
+    }
+    if (this.progress >= 1) {
+      this.child.visible = true;
+    }
+  }
+
+  color() {
+    return this.child.color();
+  }
+
+  render(p5) {
+    if (!this.parent.visible) return;
+
+    // Calculate path lengths
+    const verticalDist1 = this.midY - this.parent.y;
+    const horizontalDist = Math.abs(this.branchX - this.parent.x);
+    const verticalDist2 = this.child.y - this.midY;
+    const totalLength = verticalDist1 + horizontalDist + verticalDist2;
+
+    // Calculate how much of each segment to draw
+    const currentLength = totalLength * this.progress;
+
+    p5.stroke(180, 190, 205);
+    p5.strokeWeight(1.5);
+    p5.noFill();
+
+    // Always draw the first vertical segment from parent
+    if (currentLength > 0) {
+      const firstSegmentLength = Math.min(currentLength, verticalDist1);
+      const currentMidY = p5.lerp(this.parent.y, this.midY, firstSegmentLength / verticalDist1);
+      p5.line(this.parent.x, this.parent.y, this.parent.x, currentMidY);
+    }
+
+    if (currentLength > verticalDist1) {
+      // Draw second segment (horizontal)
+      const secondSegmentLength = Math.min(currentLength - verticalDist1, horizontalDist);
+      const currentBranchX = p5.lerp(this.parent.x, this.branchX, secondSegmentLength / horizontalDist);
+      p5.line(this.parent.x, this.midY, currentBranchX, this.midY);
+
+      if (currentLength > verticalDist1 + horizontalDist) {
+        // Draw third segment (vertical to child)
+        const thirdSegmentLength = currentLength - verticalDist1 - horizontalDist;
+        const currentChildY = p5.lerp(this.midY, this.child.y, thirdSegmentLength / verticalDist2);
+        p5.line(this.branchX, this.midY, this.branchX, currentChildY);
+      }
+    }
+  }
+}
+
+// Create a modified sketch for each stage
+function createTreeSketch(stageId) {
+  return function(p5) {
+    let nodes = [];
+    let edges = [];
+    let treeData = stageData[stageId];
+
+    p5.setup = function() {
+      const canvas = p5.createCanvas(p5.windowWidth * 0.4, p5.windowHeight);
+      canvas.parent('canvas-container');
+      p5.smooth();
+      p5.frameRate(60);
+
+      if (treeData) {
+        createTreeFromData(treeData);
+      }
+    };
+
+    p5.windowResized = function() {
+      p5.resizeCanvas(p5.windowWidth * 0.4, p5.windowHeight);
+    };
+
+    function createTreeFromData(data) {
+      // Clear existing nodes and edges
+      nodes = [];
+      edges = [];
+
+      // Add defensive checks to prevent errors
+      if (!data || !data.layout || !Array.isArray(data.layout) || !data.edges || !Array.isArray(data.edges)) {
+        console.error("Invalid tree data format:", data);
+        return; // Exit if data structure is invalid
+      }
+
+      // Find all parent nodes in edges
+      const parentNodes = new Set();
+      for (const [parentId, childId] of data.edges) {
+        parentNodes.add(parentId);
+      }
+
+      // Create nodes
+      for (let i = 0; i < data.layout.length; i++) {
+        const [nx, ny] = data.layout[i];
+        // A node is a root if it's a parent and not a child in any edge
+        const isRoot = parentNodes.has(i) && data.edges.every(edge => edge[1] !== i);
+
+        const node = new Node(
+          nx * p5.width * 0.8 + p5.width * 0.1,
+          ny * p5.height * 0.8 + p5.height * 0.1,
+          i,
+          isRoot
+        );
+        nodes.push(node);
+      }
+
+      // If no root was found, make the first parent node visible
+      if (!nodes.some(node => node.visible) && parentNodes.size > 0) {
+        // Get the first parent node
+        const firstParentId = [...parentNodes][0];
+        if (nodes[firstParentId]) {
+          nodes[firstParentId].visible = true;
+        }
+      }
+
+      // Create edges
+      for (const [parentId, childId] of data.edges) {
+        const parent = nodes[parentId];
+        const child = nodes[childId];
+        if (parent && child) { // Verify both nodes exist
+          const isLeft = child.x < parent.x;
+          const isRight = child.x > parent.x;
+          edges.push(new Edge(parent, child, isLeft, isRight));
+        }
+      }
+
+      // Select the first node by default
+      if (nodes.length > 0) {
+        nodes[0].selected = true;
+        updateNodeInfo(0);
+      }
+    }
+
+    p5.draw = function() {
+      // Use the global background color if available, otherwise use the default bgCol
+      const currentBgColor = window.bgColCurrent || bgCol;
+      p5.background(currentBgColor);
+
+      // Update and render edges
+      for (const edge of edges) {
+        edge.update();
+        edge.render(p5);
+      }
+
+      // Update and render nodes
+      for (const node of nodes) {
+        node.update();
+        node.render(p5);
+      }
+
+      // Handle mouse hover
+      p5.cursor(p5.ARROW);
+      for (const node of nodes) {
+        if (node.isMouseOver(p5)) {
+          p5.cursor(p5.HAND);
+        }
+      }
+    };
+
+    p5.mousePressed = function() {
+      // Check if any node was clicked
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].visible && nodes[i].isMouseOver(p5)) {
+          // Deselect all nodes
+          nodes.forEach(n => n.selected = false);
+          // Select the clicked node
+          nodes[i].selected = true;
+          // Update the right panel with node info
+          updateNodeInfo(i);
+          break;
+        }
+      }
+    };
+
+    function updateNodeInfo(nodeIndex) {
+      if (treeData) {
+        setNodeInfo(
+          treeData.code[nodeIndex],
+          treeData.plan[nodeIndex],
+          treeData.plot_code?.[nodeIndex],
+          treeData.plot_plan?.[nodeIndex],
+          treeData.metrics?.[nodeIndex],
+          treeData.exc_type?.[nodeIndex] || '',
+          treeData.exc_info?.[nodeIndex]?.args?.[0] || '',
+          treeData.exc_stack?.[nodeIndex] || [],
+          treeData.plots?.[nodeIndex] || [],
+          treeData.plot_analyses?.[nodeIndex] || [],
+          treeData.vlm_feedback_summary?.[nodeIndex] || '',
+          treeData.datasets_successfully_tested?.[nodeIndex] || [],
+          treeData.exec_time_feedback?.[nodeIndex] || '',
+          treeData.exec_time?.[nodeIndex] || ''
+        );
+      }
+    }
+  };
+}
+
+// Start a new p5 sketch for the given stage
+function startSketch(stageId) {
+  if (currentSketch) {
+    currentSketch.remove();
+  }
+
+  if (stageData[stageId]) {
+    currentSketch = new p5(createTreeSketch(stageId));
+
+    // Update stage info
+    const stageNumber = stageId.split('_')[1];
+    let stageDesc = '';
+    switch(stageId) {
+      case 'Stage_1': stageDesc = 'Preliminary Investigation'; break;
+      case 'Stage_2': stageDesc = 'Baseline Tuning'; break;
+      case 'Stage_3': stageDesc = 'Research Agenda Execution'; break;
+      case 'Stage_4': stageDesc = 'Ablation Studies'; break;
+    }
+
+    document.getElementById('stage-info').innerHTML =
+      `<strong>Current Stage: ${stageNumber} - ${stageDesc}</strong>`;
+  }
+}
+
+// Handle tab selection
+function selectStage(stageId) {
+  if (!stageData[stageId] || !availableStages.includes(stageId)) {
+    return; // Don't allow selection of unavailable stages
+  }
+
+  // Update active tab styles
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.classList.remove('active');
+  });
+  document.querySelector(`.tab[data-stage="${stageId}"]`).classList.add('active');
+
+  // Start the new sketch
+  currentStage = stageId;
+  startSketch(stageId);
+}
+
+// Function to load the tree data for all stages
+async function loadAllStageData(baseTreeData) {
+  console.log("Loading stage data with base data:", baseTreeData);
+
+  // The base tree data is for the current stage
+  const currentStageId = baseTreeData.current_stage || 'Stage_1';
+
+  // Ensure base tree data is valid and has required properties
+  if (baseTreeData && baseTreeData.layout && baseTreeData.edges) {
+    stageData[currentStageId] = baseTreeData;
+    availableStages.push(currentStageId);
+    console.log(`Added current stage ${currentStageId} to available stages`);
+  } else {
+    console.warn(`Current stage ${currentStageId} data is invalid:`, baseTreeData);
+  }
+
+  // Use relative path to load other stage trees
+  const logDirPath = baseTreeData.log_dir_path || '.';
+  console.log("Log directory path:", logDirPath);
+
+  // Load data for each stage if available
+  const stageNames = ['Stage_1', 'Stage_2', 'Stage_3', 'Stage_4'];
+  const stageNames2actualNames = {
+    'Stage_1': 'stage_1_initial_implementation_1_preliminary',
+    'Stage_2': 'stage_2_baseline_tuning_1_first_attempt',
+    'Stage_3': 'stage_3_creative_research_1_first_attempt',
+    'Stage_4': 'stage_4_ablation_studies_1_first_attempt'
+    }
+
+  for (const stage of stageNames) {
+
+    if (baseTreeData.completed_stages && baseTreeData.completed_stages.includes(stage)) {
+      try {
+        console.log(`Attempting to load data for ${stage} from ${logDirPath}/${stageNames2actualNames[stage]}/tree_data.json`);
+        const response = await fetch(`${logDirPath}/${stageNames2actualNames[stage]}/tree_data.json`);
+
+        if (response.ok) {
+          const data = await response.json();
+
+          // Validate the loaded data
+          if (data && data.layout && data.edges) {
+            stageData[stage] = data;
+            availableStages.push(stage);
+            console.log(`Successfully loaded and validated data for ${stage}`);
+          } else {
+            console.warn(`Loaded data for ${stage} is invalid:`, data);
+          }
+        } else {
+          console.warn(`Failed to load data for ${stage} - HTTP status ${response.status}`);
+        }
+      } catch (error) {
+        console.error(`Error loading data for ${stage}:`, error);
+      }
+    } else {
+      console.log(`Skipping stage ${stage} - not in completed stages list:`, baseTreeData.completed_stages);
+    }
+  }
+
+  // Update tab visibility based on available stages
+  updateTabVisibility();
+
+  // Start with the first available stage
+  if (availableStages.length > 0) {
+    selectStage(availableStages[0]);
+  } else {
+    console.warn("No stages available to display");
+    // Display a message in the canvas area
+    document.getElementById('canvas-container').innerHTML =
+      '<div style="padding: 20px; color: #333; text-align: center;"><h3>No valid tree data available to display</h3></div>';
+  }
+}
+
+// Update tab visibility based on available stages
+function updateTabVisibility() {
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(tab => {
+    const stageId = tab.getAttribute('data-stage');
+    if (availableStages.includes(stageId)) {
+      tab.classList.remove('disabled');
+    } else {
+      tab.classList.add('disabled');
+    }
+  });
+}
+
+// Utility function to set the node info in the right panel
+const setNodeInfo = (code, plan, plot_code, plot_plan, metrics = null, exc_type = '', exc_info = '',
+    exc_stack = [], plots = [], plot_analyses = [], vlm_feedback_summary = '',
+    datasets_successfully_tested = [], exec_time_feedback = '', exec_time = '') => {
+  const codeElm = document.getElementById("code");
+  if (codeElm) {
+    if (code) {
+      codeElm.innerHTML = hljs.highlight(code, { language: "python" }).value;
+    } else {
+      codeElm.innerHTML = '<p>No code available</p>';
+    }
+  }
+
+  const planElm = document.getElementById("plan");
+  if (planElm) {
+    if (plan) {
+      planElm.innerHTML = hljs.highlight(plan, { language: "plaintext" }).value;
+    } else {
+      planElm.innerHTML = '<p>No plan available</p>';
+    }
+  }
+
+  const plot_codeElm = document.getElementById("plot_code");
+  if (plot_codeElm) {
+    if (plot_code) {
+      plot_codeElm.innerHTML = hljs.highlight(plot_code, { language: "python" }).value;
+    } else {
+      plot_codeElm.innerHTML = '<p>No plot code available</p>';
+    }
+  }
+
+  const plot_planElm = document.getElementById("plot_plan");
+  if (plot_planElm) {
+    if (plot_plan) {
+      plot_planElm.innerHTML = hljs.highlight(plot_plan, { language: "plaintext" }).value;
+    } else {
+      plot_planElm.innerHTML = '<p>No plot plan available</p>';
+    }
+  }
+
+  const metricsElm = document.getElementById("metrics");
+  if (metricsElm) {
+      let metricsContent = `<h3>Metrics:</h3>`;
+      if (metrics && metrics.metric_names) {
+          for (const metric of metrics.metric_names) {
+              metricsContent += `<div class="metric-group">`;
+              metricsContent += `<h4>${metric.metric_name}</h4>`;
+              metricsContent += `<p><strong>Description:</strong> ${metric.description || 'N/A'}</p>`;
+              metricsContent += `<p><strong>Optimization:</strong> ${metric.lower_is_better ? 'Minimize' : 'Maximize'}</p>`;
+
+              // Create table for dataset values
+              metricsContent += `<table class="metric-table">
+                  <tr>
+                      <th>Dataset</th>
+                      <th>Final Value</th>
+                      <th>Best Value</th>
+                  </tr>`;
+
+              for (const dataPoint of metric.data) {
+                  metricsContent += `<tr>
+                      <td>${dataPoint.dataset_name}</td>
+                      <td>${dataPoint.final_value?.toFixed(4) || 'N/A'}</td>
+                      <td>${dataPoint.best_value?.toFixed(4) || 'N/A'}</td>
+                  </tr>`;
+              }
+
+              metricsContent += `</table></div>`;
+          }
+      } else if (metrics === null) {
+          metricsContent += `<p>No metrics available</p>`;
+      }
+      metricsElm.innerHTML = metricsContent;
+  }
+
+  // Add plots display
+  const plotsElm = document.getElementById("plots");
+  if (plotsElm) {
+      if (plots && plots.length > 0) {
+          let plotsContent = '';
+          plots.forEach(plotPath => {
+              plotsContent += `
+                  <div class="plot-item">
+                      <img src="${plotPath}" alt="Experiment Plot" onerror="console.error('Failed to load plot:', this.src)"/>
+                  </div>`;
+          });
+          plotsElm.innerHTML = plotsContent;
+      } else {
+          plotsElm.innerHTML = '';
+      }
+  }
+
+  // Add error info display
+  const errorElm = document.getElementById("exc_info");
+  if (errorElm) {
+    if (exc_type) {
+      let errorContent = `<h3 style="color: #ff5555">Exception Information:</h3>
+                          <p><strong>Type:</strong> ${exc_type}</p>`;
+
+      if (exc_info) {
+        errorContent += `<p><strong>Details:</strong> <pre>${JSON.stringify(exc_info, null, 2)}</pre></p>`;
+      }
+
+      if (exc_stack) {
+        errorContent += `<p><strong>Stack Trace:</strong> <pre>${exc_stack.join('\n')}</pre></p>`;
+      }
+
+      errorElm.innerHTML = errorContent;
+    } else {
+      errorElm.innerHTML = "No exception info available";
+    }
+  }
+
+  const exec_timeElm = document.getElementById("exec_time");
+  if (exec_timeElm) {
+    let exec_timeContent = '<div id="exec_time"><h3>Execution Time (in seconds):</h3><p>' + exec_time + '</p></div>';
+    exec_timeElm.innerHTML = exec_timeContent;
+  }
+
+  const exec_time_feedbackElm = document.getElementById("exec_time_feedback");
+  if (exec_time_feedbackElm) {
+    let exec_time_feedbackContent = '<div id="exec_time_feedback_content">'
+    exec_time_feedbackContent += '<h3>Execution Time Feedback:</h3>'
+    exec_time_feedbackContent += '<p>' + exec_time_feedback + '</p>'
+    exec_time_feedbackContent += '</div>';
+    exec_time_feedbackElm.innerHTML = exec_time_feedbackContent;
+  }
+
+  const vlm_feedbackElm = document.getElementById("vlm_feedback");
+  if (vlm_feedbackElm) {
+      let vlm_feedbackContent = '';
+
+      if (plot_analyses && plot_analyses.length > 0) {
+          vlm_feedbackContent += `<h3>Plot Analysis:</h3>`;
+          plot_analyses.forEach(analysis => {
+              if (analysis && analysis.plot_path) {  // Add null check
+                  vlm_feedbackContent += `
+                      <div class="plot-analysis">
+                          <h4>Analysis for ${analysis.plot_path.split('/').pop()}</h4>
+                          <p>${analysis.analysis || 'No analysis available'}</p>
+                          <ul class="key-findings">
+                              ${(analysis.key_findings || []).map(finding => `<li>${finding}</li>`).join('')}
+                          </ul>
+                      </div>`;
+              } else {
+                  console.warn('Received invalid plot analysis:', analysis);
+                  vlm_feedbackContent += `
+                      <div class="plot-analysis">
+                          <p>Invalid plot analysis data received</p>
+                      </div>`;
+              }
+          });
+      }
+
+      // Add actionable insights if available
+      if (vlm_feedback_summary && typeof vlm_feedback_summary === 'string') {
+          vlm_feedbackContent += `
+              <div class="vlm_feedback">
+                  <h3>VLM Feedback Summary:</h3>
+                  <p>${vlm_feedback_summary}</p>
+              </div>`;
+      }
+
+      console.log("Datasets successfully tested:", datasets_successfully_tested);
+      if (datasets_successfully_tested && datasets_successfully_tested.length > 0) {
+          vlm_feedbackContent += `
+              <div id="datasets_successfully_tested">
+                  <h3>Datasets Successfully Tested:</h3>
+                  <p>${datasets_successfully_tested.join(', ')}</p>
+              </div>`;
+      }
+
+      if (!vlm_feedbackContent) {
+          vlm_feedbackContent = '<p>No insights available for this experiment.</p>';
+      }
+
+      vlm_feedbackElm.innerHTML = vlm_feedbackContent;
+  }
+
+  const datasets_successfully_testedElm = document.getElementById("datasets_successfully_tested");
+  if (datasets_successfully_testedElm) {
+      let datasets_successfully_testedContent = '';
+      if (datasets_successfully_tested && datasets_successfully_tested.length > 0) {
+          datasets_successfully_testedContent = `<h3>Datasets Successfully Tested:</h3><ul>`;
+          datasets_successfully_tested.forEach(dataset => {
+              datasets_successfully_testedContent += `<li>${dataset}</li>`;
+          });
+          datasets_successfully_testedContent += `</ul>`;
+      } else {
+          datasets_successfully_testedContent = '<p>No datasets tested yet</p>';
+      }
+      datasets_successfully_testedElm.innerHTML = datasets_successfully_testedContent;
+  }
+};
+
+// Initialize with the provided tree data
+const treeStructData = {"edges": [[0, 5], [2, 3], [3, 7], [3, 8], [3, 9], [3, 6]], "layout": [[0.0, 0.0], [0.2857142857142857, 0.0], [0.5714285714285714, 0.0], [0.5714285714285714, 0.5], [0.8571428571428571, 0.0], [0.0, 0.5], [0.14285714285714285, 1.0], [0.42857142857142855, 1.0], [0.7142857142857143, 1.0], [1.0, 1.0]], "plan": ["We create a synthetic 2D classification dataset with a true feature and a\nspurious feature that is highly correlated with the label in the training set\nbut uncorrelated in the test set, defining four ground\u2010truth groups. We train a\nlogistic regression model under ERM for several epochs, then compute per\u2010sample\ninput gradients of the BCE loss to form gradient signatures. We cluster these\ngradient signatures with K\u2010means into four pseudo\u2010groups, then re\u2010train a fresh\nlogistic model using inverse\u2010frequency weighting per pseudo\u2010group to approximate\ngroup\u2010robust optimization. At each epoch of robust training we compute and print\nthe validation loss and worst\u2010group accuracy on the test set. We track per\u2010epoch\ntraining/validation losses and worst\u2010group accuracies, as well as final test\npredictions and ground\u2010truth labels, saving all data in a single numpy file.", "We will perform binary classification on MNIST digits {0,1} with a synthetic\nbinary spurious feature correlated with the label in training but random at test\ntime.  A simple 2-layer MLP is first trained for one epoch, then frozen so we\ncan compute per-sample gradients with respect to the input to capture latent\nfeature sensitivities.  We stack each image\u2019s flattened pixels with its spurious\nbit, collect the input gradients for all training samples, and cluster these\ngradient signatures via k-means into two pseudo-groups.  We then reinitialize\nthe MLP and perform Group DRO\u2013style training, weighting each example\u2019s loss by\nits current cluster weight and updating the cluster weights after each epoch\nbased on average per-group loss.  At each epoch we evaluate on the unbiased test\nset, computing and printing the required validation loss line as well as the\nworst-group accuracy across the true spurious feature values.  Finally, we save\nall metrics, losses, predictions, and ground truths into an `experiment_data`\ndictionary under `working/experiment_data.npy`.  This simple pipeline\nestablishes a working baseline for unsupervised gradient clustering.", "We generate a small synthetic binary\u2010classification dataset where a spurious\nbinary feature correlates strongly with the label, and we append it to\ncontinuous Gaussian inputs. A two\u2010layer MLP is trained for one warmup epoch,\nafter which we compute per\u2010sample gradients of the output layer on each training\nexample and cluster them into two pseudo\u2010groups via k\u2010means. We then derive\ninverse\u2010frequency weights from these clusters and continue training the same\nmodel with sample\u2010wise weighted loss to emphasize underrepresented clusters. At\neach epoch we log average training and validation losses, compute and print the\nvalidation loss, and record worst\u2010group accuracy on both splits based on the\ntrue spurious groups. After all epochs we run the final model on a held\u2010out test\nset to collect predictions and ground\u2010truth labels. All metrics, losses,\npredictions, and labels are stored in an `experiment_data` dict and saved as a\nNumPy file under `./working`. The code handles GPU/CPU automatic placement,\nnormalizes continuous inputs, and follows the required logging and saving\nconventions.", "We replace the missing sklearn dependency by implementing a simple NumPy k-means\nfunction that randomly initializes centroids and alternates between assigning\npoints and updating centroids for a fixed number of iterations. After the warmup\nepoch, we collect per-sample gradients, run our custom kmeans to get two\nclusters, and compute sample weights as the inverse of cluster sizes. The rest\nof the training, evaluation, and saving logic remains unchanged, with proper\nGPU/CPU handling and data movement. This fixes the ModuleNotFoundError and\nmaintains the intended unsupervised gradient clustering workflow.", "We generate a Colored MNIST dataset by tinting standard MNIST digits with a\nred/green background spurious feature correlated with the digit label during\ntraining (p=0.9) and with a weaker correlation at validation (p=0.5). A small\nCNN is defined and moved to GPU, and we run one forward-backward pass per\ntraining sample to collect per-sample gradients from the final linear layer. We\nflatten these gradient signatures and apply k-means clustering into k=4 pseudo-\ngroups that capture latent spurious patterns. In subsequent training, we perform\ngroup-robust optimization by reweighting each sample\u2019s cross-entropy loss\ninversely to its pseudo-group frequency, thereby balancing learning across\nclusters. We train for a fixed number of epochs, tracking training and\nvalidation loss and computing worst-group accuracy over the four true groups at\neach epoch. After training, we evaluate on the validation set to get final\nworst-group accuracy, gather all per-epoch metrics, losses, final predictions,\nand ground-truth group IDs into an experiment_data dict. The script\nautomatically uses GPU if available and prints validation loss and worst-group\naccuracy every epoch. Finally, we save the entire experiment_data as a NumPy\nfile in working/experiment_data.npy.", "We replace the sklearn dependency by implementing a simple NumPy k-means\nfunction that initializes centers randomly and iterates assignment and update\nsteps for a fixed number of iterations. After extracting per-sample gradients\nfrom the ERM model, we cluster them with this `simple_kmeans` to form pseudo-\ngroups and compute inverse-frequency weights. The rest of the training\npipeline\u2014including device handling, robust reweighting training, and worst-group\naccuracy evaluation\u2014remains the same, and all metrics are logged and saved per\nepoch.", "Seed node", "Seed node", "Seed node", "Aggregate results from multiple seeds"], "code": ["import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport numpy as np\nimport torch\nimport torch.nn as nn\nfrom torch.utils.data import TensorDataset, DataLoader\nfrom sklearn.cluster import KMeans\n\n# GPU setup\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Generate synthetic 2D data with spurious correlation\nnp.random.seed(0)\nn_train, n_test = 10000, 2000\np_train, p_test = 0.9, 0.5\n# true label\ny_train = np.random.binomial(1, 0.5, n_train)\ns_train = np.random.binomial(1, p_train, n_train)\ny_test = np.random.binomial(1, 0.5, n_test)\ns_test = np.random.binomial(1, p_test, n_test)\n# features: x1 true, x2 spurious\nx1_train = np.random.randn(n_train) + (2 * y_train - 1) * 2.0\nx2_train = np.random.randn(n_train) + (2 * s_train - 1) * 2.0\nx1_test = np.random.randn(n_test) + (2 * y_test - 1) * 2.0\nx2_test = np.random.randn(n_test) + (2 * s_test - 1) * 2.0\nX_train = np.stack([x1_train, x2_train], axis=1)\nX_test = np.stack([x1_test, x2_test], axis=1)\n# normalize inputs\nmean, std = X_train.mean(0), X_train.std(0)\nX_train = (X_train - mean) / std\nX_test = (X_test - mean) / std\n# group ids\ng_train = 2 * y_train + s_train\ng_test = 2 * y_test + s_test\n\n# Datasets and loaders\ntrain_dataset = TensorDataset(\n    torch.from_numpy(X_train).float(),\n    torch.from_numpy(y_train).float(),\n    torch.from_numpy(g_train).long(),\n)\ntest_dataset = TensorDataset(\n    torch.from_numpy(X_test).float(),\n    torch.from_numpy(y_test).float(),\n    torch.from_numpy(g_test).long(),\n)\ntrain_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)\ntrain_eval_loader = DataLoader(train_dataset, batch_size=256, shuffle=False)\ntest_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)\n\n\n# Simple logistic regression model\nclass LogisticModel(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.linear = nn.Linear(2, 1)\n\n    def forward(self, x):\n        return self.linear(x)\n\n\n# Initial ERM training\nmodel_erm = LogisticModel().to(device)\noptimizer_erm = torch.optim.SGD(model_erm.parameters(), lr=0.1)\nloss_fn_erm = nn.BCEWithLogitsLoss()\nfor epoch in range(5):\n    model_erm.train()\n    for x_b, y_b, _ in train_loader:\n        x_b, y_b = x_b.to(device), y_b.to(device)\n        optimizer_erm.zero_grad()\n        logits = model_erm(x_b).squeeze()\n        loss = loss_fn_erm(logits, y_b)\n        loss.backward()\n        optimizer_erm.step()\n\n# Extract per-sample input gradients for clustering\nwith torch.no_grad():\n    X_device = torch.from_numpy(X_train).float().to(device)\n    Y_device = torch.from_numpy(y_train).float().to(device)\n    logits = model_erm(X_device).squeeze()\n    probs = torch.sigmoid(logits)\n    grads = (probs - Y_device).unsqueeze(1) * X_device\n    grads_np = grads.cpu().numpy()\nkmeans = KMeans(n_clusters=4, random_state=0).fit(grads_np)\ncluster_ids = kmeans.labels_\n# inverse-frequency weights per pseudo-group\ncounts = np.bincount(cluster_ids, minlength=4)\ncluster_weights = 1.0 / counts\ncluster_weights = torch.from_numpy(cluster_weights).float().to(device)\n\n# Prepare robust training dataset with pseudo-group ids\ntrain_dataset2 = TensorDataset(\n    torch.from_numpy(X_train).float(),\n    torch.from_numpy(y_train).float(),\n    torch.from_numpy(cluster_ids).long(),\n)\ntrain_loader2 = DataLoader(train_dataset2, batch_size=128, shuffle=True)\n\n\n# Utility for worst-group accuracy\ndef worst_group_accuracy(preds, labels, groups):\n    accs = []\n    for g in np.unique(groups):\n        mask = groups == g\n        if mask.sum() > 0:\n            accs.append((preds[mask] == labels[mask]).mean())\n    return float(np.min(accs))\n\n\n# Experiment data structure\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n# Robust reweighting training\nmodel = LogisticModel().to(device)\noptimizer = torch.optim.SGD(model.parameters(), lr=0.1)\nloss_fn = nn.BCEWithLogitsLoss(reduction=\"none\")\nfor epoch in range(1, 6):\n    model.train()\n    train_loss_sum = 0.0\n    for x_b, y_b, c_b in train_loader2:\n        x_b, y_b, c_b = x_b.to(device), y_b.to(device), c_b.to(device)\n        optimizer.zero_grad()\n        logits = model(x_b).squeeze()\n        loss = loss_fn(logits, y_b)\n        weighted = (loss * cluster_weights[c_b]).mean()\n        weighted.backward()\n        optimizer.step()\n        train_loss_sum += weighted.item() * x_b.size(0)\n    train_loss = train_loss_sum / len(train_dataset2)\n\n    # evaluate on training set\n    model.eval()\n    with torch.no_grad():\n        # train worst-group acc\n        all_p, all_y, all_g = [], [], []\n        for x_b, y_b, g_b in train_eval_loader:\n            x_b, y_b = x_b.to(device), y_b.to(device)\n            logits = model(x_b).squeeze()\n            preds = (torch.sigmoid(logits) > 0.5).long().cpu().numpy()\n            all_p.append(preds)\n            all_y.append(y_b.cpu().numpy())\n            all_g.append(g_b.numpy())\n        train_pred = np.concatenate(all_p)\n        train_true = np.concatenate(all_y)\n        train_grp = np.concatenate(all_g)\n        train_wg_acc = worst_group_accuracy(train_pred, train_true, train_grp)\n\n        # validation (test) loss & worst-group\n        val_loss_sum, all_p, all_y, all_g = 0.0, [], [], []\n        for x_b, y_b, g_b in test_loader:\n            x_b, y_b = x_b.to(device), y_b.to(device)\n            logits = model(x_b).squeeze()\n            loss = loss_fn(logits, y_b).mean()\n            val_loss_sum += loss.item() * x_b.size(0)\n            preds = (torch.sigmoid(logits) > 0.5).long().cpu().numpy()\n            all_p.append(preds)\n            all_y.append(y_b.cpu().numpy())\n            all_g.append(g_b.numpy())\n        val_loss = val_loss_sum / len(test_dataset)\n        val_pred = np.concatenate(all_p)\n        val_true = np.concatenate(all_y)\n        val_grp = np.concatenate(all_g)\n        val_wg_acc = worst_group_accuracy(val_pred, val_true, val_grp)\n\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(train_loss)\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(val_loss)\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_wg_acc)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_wg_acc)\n\n# final predictions and ground truth\nexperiment_data[\"synthetic\"][\"predictions\"] = val_pred\nexperiment_data[\"synthetic\"][\"ground_truth\"] = val_true\n\n# save all experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nfrom torch.utils.data import Dataset, DataLoader\nfrom torchvision import datasets, transforms\nfrom sklearn.cluster import KMeans\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n\nclass SpuriousMNIST(Dataset):\n    def __init__(self, train=True, p=0.9, subset_size=None):\n        data = datasets.MNIST(root=working_dir, train=train, download=True)\n        # filter to digits 0 and 1\n        mask = (data.targets == 0) | (data.targets == 1)\n        images = data.data[mask]\n        labels = data.targets[mask]\n        # assign spurious bit\n        n = len(labels)\n        corr = np.random.rand(n) < p\n        sp = np.where(corr, labels.numpy(), 1 - labels.numpy())\n        self.images = images\n        self.labels = labels.long()\n        self.spurious = torch.from_numpy(sp).long()\n        if subset_size and n > subset_size:\n            idx = np.random.choice(n, subset_size, replace=False)\n            self.images = self.images[idx]\n            self.labels = self.labels[idx]\n            self.spurious = self.spurious[idx]\n        self.transform = transforms.ToTensor()\n\n    def __len__(self):\n        return len(self.labels)\n\n    def __getitem__(self, idx):\n        img = self.transform(self.images[idx])\n        return {\n            \"idx\": torch.tensor(idx, dtype=torch.long),\n            \"image\": img,\n            \"label\": self.labels[idx],\n            \"spurious\": self.spurious[idx],\n        }\n\n\n# prepare data\ntrain_ds = SpuriousMNIST(train=True, p=0.95, subset_size=5000)\nval_ds = SpuriousMNIST(train=False, p=0.5)\ntrain_loader = DataLoader(train_ds, batch_size=64, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=256, shuffle=False)\n\n\n# simple MLP\nclass MLP(nn.Module):\n    def __init__(self, input_dim=785):\n        super().__init__()\n        self.fc1 = nn.Linear(input_dim, 512)\n        self.fc2 = nn.Linear(512, 2)\n\n    def forward(self, x):\n        x = F.leaky_relu(self.fc1(x))\n        return self.fc2(x)\n\n\n# warm-up ERM for gradient extraction\nmodel = MLP().to(device)\nopt = torch.optim.Adam(model.parameters(), lr=1e-3)\nfor _ in range(1):\n    model.train()\n    for batch in train_loader:\n        batch = {\n            k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)\n        }\n        x = batch[\"image\"].view(batch[\"image\"].size(0), -1)\n        x = torch.cat([x, batch[\"spurious\"].unsqueeze(1).float()], dim=1)\n        logits = model(x)\n        loss = F.cross_entropy(logits, batch[\"label\"])\n        opt.zero_grad()\n        loss.backward()\n        opt.step()\n\n# freeze and extract per-sample input gradients\nfor p in model.parameters():\n    p.requires_grad = False\ngrads = []\nmodel.eval()\nfor i in range(len(train_ds)):\n    samp = train_ds[i]\n    img = samp[\"image\"].unsqueeze(0).to(device)\n    sp = samp[\"spurious\"].unsqueeze(0).to(device).float()\n    inp = img.view(1, -1)\n    inp = torch.cat([inp, sp.unsqueeze(1)], dim=1).requires_grad_(True)\n    out = model(inp)\n    l = F.cross_entropy(out, samp[\"label\"].unsqueeze(0).to(device))\n    model.zero_grad()\n    if inp.grad is not None:\n        inp.grad.zero_()\n    l.backward()\n    grads.append(inp.grad.detach().cpu().numpy().flatten())\ngrads = np.stack(grads, axis=0)\n\n# cluster into 2 pseudo-groups\nn_clusters = 2\nkmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(grads)\ntrain_ds.pseudo_groups = kmeans.labels_\n\n# Group-DRO style training using pseudo-groups\nmodel = MLP().to(device)\nopt = torch.optim.Adam(model.parameters(), lr=1e-3)\nq = torch.ones(n_clusters, device=device) / n_clusters\n\nexperiment_data = {\n    \"spurious_mnist\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\nepochs = 5\nfor epoch in range(1, epochs + 1):\n    # train with weighted losses\n    model.train()\n    train_loss = 0.0\n    for batch in train_loader:\n        batch = {\n            k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)\n        }\n        x = batch[\"image\"].view(batch[\"image\"].size(0), -1)\n        x = torch.cat([x, batch[\"spurious\"].unsqueeze(1).float()], dim=1)\n        logits = model(x)\n        losses = F.cross_entropy(logits, batch[\"label\"], reduction=\"none\")\n        idxs = batch[\"idx\"].cpu().numpy().tolist()\n        pg = torch.tensor(\n            [train_ds.pseudo_groups[i] for i in idxs], device=device, dtype=torch.long\n        )\n        w = q[pg]\n        loss = (losses * w).mean()\n        opt.zero_grad()\n        loss.backward()\n        opt.step()\n        train_loss += loss.item() * x.size(0)\n    train_loss /= len(train_ds)\n    experiment_data[\"spurious_mnist\"][\"losses\"][\"train\"].append(train_loss)\n    # compute train worst-group acc\n    model.eval()\n    gc = {0: 0, 1: 0}\n    gt = {0: 0, 1: 0}\n    with torch.no_grad():\n        for batch in train_loader:\n            batch = {\n                k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)\n            }\n            x = batch[\"image\"].view(batch[\"image\"].size(0), -1)\n            x = torch.cat([x, batch[\"spurious\"].unsqueeze(1).float()], dim=1)\n            preds = model(x).argmax(1)\n            for p, y, s in zip(\n                preds.cpu().numpy(),\n                batch[\"label\"].cpu().numpy(),\n                batch[\"spurious\"].cpu().numpy(),\n            ):\n                gt[int(s)] += 1\n                if p == y:\n                    gc[int(s)] += 1\n    train_accs = [gc[g] / gt[g] for g in range(n_clusters)]\n    wg_train = min(train_accs)\n    experiment_data[\"spurious_mnist\"][\"metrics\"][\"train\"].append(wg_train)\n\n    # validation and worst-group accuracy\n    val_loss = 0.0\n    vc = {0: 0, 1: 0}\n    vt = {0: 0, 1: 0}\n    preds_all, y_all = [], []\n    with torch.no_grad():\n        for batch in val_loader:\n            batch = {\n                k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)\n            }\n            x = batch[\"image\"].view(batch[\"image\"].size(0), -1)\n            x = torch.cat([x, batch[\"spurious\"].unsqueeze(1).float()], dim=1)\n            out = model(x)\n            loss = F.cross_entropy(out, batch[\"label\"])\n            val_loss += loss.item() * x.size(0)\n            preds = out.argmax(1)\n            for p, y, s in zip(\n                preds.cpu().numpy(),\n                batch[\"label\"].cpu().numpy(),\n                batch[\"spurious\"].cpu().numpy(),\n            ):\n                vt[int(s)] += 1\n                if p == y:\n                    vc[int(s)] += 1\n                preds_all.append(int(p))\n                y_all.append(int(y))\n    val_loss /= len(val_ds)\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n    val_accs = [vc[g] / vt[g] for g in range(n_clusters)]\n    wg_val = min(val_accs)\n    experiment_data[\"spurious_mnist\"][\"losses\"][\"val\"].append(val_loss)\n    experiment_data[\"spurious_mnist\"][\"metrics\"][\"val\"].append(wg_val)\n    experiment_data[\"spurious_mnist\"][\"predictions\"] = preds_all\n    experiment_data[\"spurious_mnist\"][\"ground_truth\"] = y_all\n\n    # update group weights q\n    gl = torch.zeros(n_clusters, device=device)\n    gcnt = torch.zeros(n_clusters, device=device)\n    with torch.no_grad():\n        for batch in train_loader:\n            batch = {\n                k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)\n            }\n            x = batch[\"image\"].view(batch[\"image\"].size(0), -1)\n            x = torch.cat([x, batch[\"spurious\"].unsqueeze(1).float()], dim=1)\n            logits = model(x)\n            losses = F.cross_entropy(logits, batch[\"label\"], reduction=\"none\")\n            idxs = batch[\"idx\"].cpu().numpy().tolist()\n            for lval, ii in zip(losses.cpu().numpy(), idxs):\n                g = train_ds.pseudo_groups[ii]\n                gl[g] += lval\n                gcnt[g] += 1\n    gl /= gcnt\n    q = (gl / gl.sum()).to(device)\n\n# save all experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport numpy as np\nimport torch\nimport torch.nn as nn\nfrom torch.utils.data import DataLoader, Dataset\nfrom sklearn.cluster import KMeans\n\n# Device setup\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Create synthetic dataset with spurious feature\nnp.random.seed(0)\nN, d = 2000, 5\ny = np.random.binomial(1, 0.5, size=N)\nX_cont = np.random.randn(N, d) + 2 * y.reshape(-1, 1)\nspurious_corr = 0.95\nrnd = np.random.rand(N)\ns = np.where(rnd < spurious_corr, y, 1 - y)\nX = np.concatenate([X_cont, s.reshape(-1, 1)], axis=1)\n\n# Split indices\nidxs = np.arange(N)\nnp.random.shuffle(idxs)\ntrain_idx, val_idx, test_idx = idxs[:1000], idxs[1000:1500], idxs[1500:]\n\n# Normalize continuous features\nmean = X[train_idx, :d].mean(axis=0)\nstd = X[train_idx, :d].std(axis=0) + 1e-6\nX_norm = X.copy()\nX_norm[:, :d] = (X_norm[:, :d] - mean) / std\n\n# Prepare splits\nsplits = {}\nsplits[\"train\"] = (X_norm[train_idx], y[train_idx], s[train_idx])\nsplits[\"val\"] = (X_norm[val_idx], y[val_idx], s[val_idx])\nsplits[\"test\"] = (X_norm[test_idx], y[test_idx], s[test_idx])\n\n\nclass SyntheticDataset(Dataset):\n    def __init__(self, X, y, g):\n        self.X = torch.tensor(X, dtype=torch.float32)\n        self.y = torch.tensor(y, dtype=torch.long)\n        self.g = torch.tensor(g, dtype=torch.long)\n\n    def __len__(self):\n        return len(self.y)\n\n    def __getitem__(self, idx):\n        return {\n            \"features\": self.X[idx],\n            \"label\": self.y[idx],\n            \"group\": self.g[idx],\n            \"idx\": idx,\n        }\n\n\n# Create DataLoaders\ntrain_ds = SyntheticDataset(*splits[\"train\"])\nval_ds = SyntheticDataset(*splits[\"val\"])\ntest_ds = SyntheticDataset(*splits[\"test\"])\ntrain_loader = DataLoader(train_ds, batch_size=64, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=256, shuffle=False)\ntest_loader = DataLoader(test_ds, batch_size=256, shuffle=False)\ncluster_loader = DataLoader(train_ds, batch_size=1, shuffle=False)\n\n\n# Define model\nclass MLP(nn.Module):\n    def __init__(self, inp_dim, hid=32):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(inp_dim, hid), nn.ReLU(), nn.Linear(hid, hid), nn.ReLU()\n        )\n        self.fc = nn.Linear(hid, 2)\n\n    def forward(self, x):\n        return self.fc(self.net(x))\n\n\nmodel = MLP(d + 1).to(device)\ncriterion = nn.CrossEntropyLoss(reduction=\"none\")\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\n\n# Storage for experiment\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n\n# Evaluation helper\ndef evaluate(loader):\n    loss_sum = 0.0\n    correct = {0: 0, 1: 0}\n    total = {0: 0, 1: 0}\n    with torch.no_grad():\n        for batch in loader:\n            batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n            x, yb, grp = batch[\"features\"], batch[\"label\"], batch[\"group\"]\n            out = model(x)\n            losses = criterion(out, yb)\n            loss_sum += losses.sum().item()\n            preds = out.argmax(1)\n            for g in [0, 1]:\n                mask = grp == g\n                total[g] += mask.sum().item()\n                if mask.sum().item() > 0:\n                    correct[g] += (preds[mask] == yb[mask]).sum().item()\n    wg_acc = min(correct[g] / total[g] if total[g] > 0 else 0.0 for g in [0, 1])\n    return loss_sum, wg_acc\n\n\n# Training with warmup + gradient clustering\nwarmup_epochs = 1\ntrain_epochs = 5\ntotal_epochs = warmup_epochs + train_epochs\nsample_weights = None\n\nfor epoch in range(total_epochs):\n    model.train()\n    for batch in train_loader:\n        batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n        x, yb, idxb = batch[\"features\"], batch[\"label\"], batch[\"idx\"]\n        out = model(x)\n        losses = criterion(out, yb)\n        if epoch >= warmup_epochs and sample_weights is not None:\n            sw = sample_weights[idxb]\n            loss = (losses * sw).mean()\n        else:\n            loss = losses.mean()\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n    # after warmup epoch, cluster gradients\n    if epoch == warmup_epochs - 1:\n        model.eval()\n        grads = []\n        for sample in cluster_loader:\n            batch = {k: v.to(device) for k, v in sample.items() if torch.is_tensor(v)}\n            optimizer.zero_grad()\n            out = model(batch[\"features\"])\n            loss_i = criterion(out, batch[\"label\"]).mean()\n            loss_i.backward()\n            g = model.fc.weight.grad.detach().cpu().view(-1).clone().numpy()\n            grads.append(g)\n        grads = np.stack(grads)\n        km = KMeans(n_clusters=2, random_state=0).fit(grads)\n        labels = km.labels_\n        counts = np.bincount(labels, minlength=2)\n        sw_arr = np.array([1.0 / counts[lab] for lab in labels], dtype=np.float32)\n        sample_weights = torch.tensor(sw_arr, device=device)\n\n    # Evaluate\n    train_loss, train_wg = evaluate(train_loader)\n    val_loss, val_wg = evaluate(val_loader)\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(train_loss / len(train_ds))\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(val_loss / len(val_ds))\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_wg)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_wg)\n\n# Final test predictions\nmodel.eval()\npreds, truths = [], []\nwith torch.no_grad():\n    for batch in test_loader:\n        batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n        out = model(batch[\"features\"])\n        preds.extend(out.argmax(1).cpu().numpy().tolist())\n        truths.extend(batch[\"label\"].cpu().numpy().tolist())\nexperiment_data[\"synthetic\"][\"predictions\"] = np.array(preds)\nexperiment_data[\"synthetic\"][\"ground_truth\"] = np.array(truths)\n\n# Save all experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport numpy as np\nimport torch\nimport torch.nn as nn\nfrom torch.utils.data import DataLoader, Dataset\n\n# Device setup\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Create synthetic dataset with spurious feature\nnp.random.seed(0)\nN, d = 2000, 5\ny = np.random.binomial(1, 0.5, size=N)\nX_cont = np.random.randn(N, d) + 2 * y.reshape(-1, 1)\nspurious_corr = 0.95\nrnd = np.random.rand(N)\ns = np.where(rnd < spurious_corr, y, 1 - y)\nX = np.concatenate([X_cont, s.reshape(-1, 1)], axis=1)\n\n# Split indices\nidxs = np.arange(N)\nnp.random.shuffle(idxs)\ntrain_idx, val_idx, test_idx = idxs[:1000], idxs[1000:1500], idxs[1500:]\n\n# Normalize continuous features\nmean = X[train_idx, :d].mean(axis=0)\nstd = X[train_idx, :d].std(axis=0) + 1e-6\nX_norm = X.copy()\nX_norm[:, :d] = (X_norm[:, :d] - mean) / std\n\n# Prepare splits\nsplits = {}\nsplits[\"train\"] = (X_norm[train_idx], y[train_idx], s[train_idx])\nsplits[\"val\"] = (X_norm[val_idx], y[val_idx], s[val_idx])\nsplits[\"test\"] = (X_norm[test_idx], y[test_idx], s[test_idx])\n\n\nclass SyntheticDataset(Dataset):\n    def __init__(self, X, y, g):\n        self.X = torch.tensor(X, dtype=torch.float32)\n        self.y = torch.tensor(y, dtype=torch.long)\n        self.g = torch.tensor(g, dtype=torch.long)\n\n    def __len__(self):\n        return len(self.y)\n\n    def __getitem__(self, idx):\n        return {\n            \"features\": self.X[idx],\n            \"label\": self.y[idx],\n            \"group\": self.g[idx],\n            \"idx\": idx,\n        }\n\n\n# DataLoaders\ntrain_ds = SyntheticDataset(*splits[\"train\"])\nval_ds = SyntheticDataset(*splits[\"val\"])\ntest_ds = SyntheticDataset(*splits[\"test\"])\ntrain_loader = DataLoader(train_ds, batch_size=64, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=256, shuffle=False)\ntest_loader = DataLoader(test_ds, batch_size=256, shuffle=False)\ncluster_loader = DataLoader(train_ds, batch_size=1, shuffle=False)\n\n\n# Simple NumPy k-means implementation\ndef kmeans_np(X, n_clusters=2, n_iters=10):\n    rng = np.random.RandomState(0)\n    N, D = X.shape\n    init_idxs = rng.choice(N, n_clusters, replace=False)\n    centroids = X[init_idxs].copy()\n    labels = np.zeros(N, dtype=int)\n    for _ in range(n_iters):\n        dists = np.sum((X[:, None, :] - centroids[None, :, :]) ** 2, axis=2)\n        new_labels = np.argmin(dists, axis=1)\n        if np.all(new_labels == labels):\n            break\n        labels = new_labels\n        for k in range(n_clusters):\n            pts = X[labels == k]\n            if len(pts) > 0:\n                centroids[k] = pts.mean(axis=0)\n            else:\n                centroids[k] = X[rng.randint(N)]\n    return labels\n\n\n# Model definition\nclass MLP(nn.Module):\n    def __init__(self, inp_dim, hid=32):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(inp_dim, hid), nn.ReLU(), nn.Linear(hid, hid), nn.ReLU()\n        )\n        self.fc = nn.Linear(hid, 2)\n\n    def forward(self, x):\n        return self.fc(self.net(x))\n\n\nmodel = MLP(d + 1).to(device)\ncriterion = nn.CrossEntropyLoss(reduction=\"none\")\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\n\n# Experiment storage\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n\n# Evaluation helper\ndef evaluate(loader):\n    loss_sum = 0.0\n    correct = {0: 0, 1: 0}\n    total = {0: 0, 1: 0}\n    with torch.no_grad():\n        for batch in loader:\n            batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n            x, yb, grp = batch[\"features\"], batch[\"label\"], batch[\"group\"]\n            out = model(x)\n            losses = criterion(out, yb)\n            loss_sum += losses.sum().item()\n            preds = out.argmax(1)\n            for g in [0, 1]:\n                mask = grp == g\n                total[g] += mask.sum().item()\n                if mask.sum().item() > 0:\n                    correct[g] += (preds[mask] == yb[mask]).sum().item()\n    wg_acc = min(correct[g] / total[g] if total[g] > 0 else 0.0 for g in [0, 1])\n    return loss_sum, wg_acc\n\n\n# Training loop with warmup + gradient clustering\nwarmup_epochs = 1\ntrain_epochs = 5\ntotal_epochs = warmup_epochs + train_epochs\nsample_weights = None\n\nfor epoch in range(total_epochs):\n    model.train()\n    for batch in train_loader:\n        batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n        x, yb, idxb = batch[\"features\"], batch[\"label\"], batch[\"idx\"]\n        out = model(x)\n        losses = criterion(out, yb)\n        if epoch >= warmup_epochs and sample_weights is not None:\n            sw = sample_weights[idxb]\n            loss = (losses * sw).mean()\n        else:\n            loss = losses.mean()\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n    # Cluster gradients after warmup\n    if epoch == warmup_epochs - 1:\n        model.eval()\n        grads = []\n        for sample in cluster_loader:\n            batch = {k: v.to(device) for k, v in sample.items() if torch.is_tensor(v)}\n            optimizer.zero_grad()\n            out = model(batch[\"features\"])\n            loss_i = criterion(out, batch[\"label\"]).mean()\n            loss_i.backward()\n            g = model.fc.weight.grad.detach().cpu().view(-1).numpy()\n            grads.append(g)\n        grads = np.stack(grads)\n        labels = kmeans_np(grads, n_clusters=2, n_iters=10)\n        counts = np.bincount(labels, minlength=2)\n        sw_arr = np.array([1.0 / counts[lab] for lab in labels], dtype=np.float32)\n        sample_weights = torch.tensor(sw_arr, device=device)\n    # Evaluate\n    train_loss, train_wg = evaluate(train_loader)\n    val_loss, val_wg = evaluate(val_loader)\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(train_loss / len(train_ds))\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(val_loss / len(val_ds))\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_wg)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_wg)\n\n# Final test predictions\nmodel.eval()\npreds, truths = [], []\nwith torch.no_grad():\n    for batch in test_loader:\n        batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n        out = model(batch[\"features\"])\n        preds.extend(out.argmax(1).cpu().numpy().tolist())\n        truths.extend(batch[\"label\"].cpu().numpy().tolist())\nexperiment_data[\"synthetic\"][\"predictions\"] = np.array(preds)\nexperiment_data[\"synthetic\"][\"ground_truth\"] = np.array(truths)\n\n# Save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport torch\nfrom torch import nn, optim\nimport torch.nn.functional as F\nfrom torch.utils.data import Dataset, DataLoader\nfrom torchvision import datasets, transforms\nimport numpy as np\nfrom sklearn.cluster import KMeans\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n\nclass ColoredMNIST(Dataset):\n    def __init__(self, train=True, n_samples=1000, p_spurious=0.9, transform=None):\n        mnist = datasets.MNIST(root=working_dir, train=train, download=True)\n        data, targets = mnist.data.float() / 255.0, mnist.targets\n        mask = (targets == 0) | (targets == 1)\n        data, targets = data[mask], targets[mask]\n        idxs = torch.randperm(len(data))[:n_samples]\n        self.images = data[idxs].unsqueeze(1).repeat(1, 3, 1, 1)\n        self.labels = targets[idxs]\n        self.transform = transform\n        self.spurious = torch.zeros(len(self.labels), dtype=torch.long)\n        for i, y in enumerate(self.labels):\n            self.spurious[i] = y if np.random.rand() < p_spurious else 1 - y\n        self.groups = self.labels * 2 + self.spurious\n        self.pseudo_groups = None\n\n    def set_pseudo_groups(self, pg):\n        self.pseudo_groups = pg\n\n    def __len__(self):\n        return len(self.labels)\n\n    def __getitem__(self, idx):\n        x = self.images[idx].clone()\n        c = self.spurious[idx]\n        if c == 0:\n            x[1:] *= 0.1\n        else:\n            x[[0, 2]] *= 0.1\n        if self.transform:\n            x = self.transform(x)\n        y = self.labels[idx]\n        true_g = self.groups[idx]\n        pg = (\n            torch.tensor(self.pseudo_groups[idx])\n            if self.pseudo_groups is not None\n            else torch.tensor(-1)\n        )\n        return x, y, pg, true_g\n\n\ntransform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))\ntrain_ds = ColoredMNIST(train=True, n_samples=2000, p_spurious=0.9, transform=transform)\nval_ds = ColoredMNIST(train=False, n_samples=1000, p_spurious=0.5, transform=transform)\n\n# Warmup: per-sample gradient extraction\nmodel = nn.Sequential(\n    nn.Conv2d(3, 32, 3, padding=1),\n    nn.ReLU(),\n    nn.MaxPool2d(2),\n    nn.Conv2d(32, 64, 3, padding=1),\n    nn.ReLU(),\n    nn.MaxPool2d(2),\n    nn.Flatten(),\n    nn.Linear(64 * 7 * 7, 2),\n).to(device)\ncriterion = nn.CrossEntropyLoss()\ngrads = []\nfull_loader = DataLoader(train_ds, batch_size=1, shuffle=False)\nfor x, y, _, _ in full_loader:\n    x, y = x.to(device), y.to(device)\n    model.zero_grad()\n    out = model(x)\n    criterion(out, y).backward()\n    grads.append(model[-1].weight.grad.detach().cpu().view(-1).numpy())\ngrads = np.stack(grads, 0)\n\n# Clustering\nk = 4\nkmeans = KMeans(n_clusters=k, random_state=0).fit(grads)\ntrain_ds.set_pseudo_groups(kmeans.labels_)\n\n# DataLoaders\ntrain_loader = DataLoader(train_ds, batch_size=64, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=64, shuffle=False)\n\noptimizer = optim.Adam(model.parameters(), lr=1e-3)\nexperiment_data = {\n    \"colored_mnist\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n\ndef evaluate(loader):\n    model.eval()\n    total_loss, count = 0.0, 0\n    group_corr, group_cnt = {}, {}\n    with torch.no_grad():\n        for x, y, _, true_g in loader:\n            x, y = x.to(device), y.to(device)\n            out = model(x)\n            total_loss += criterion(out, y).item() * x.size(0)\n            preds = out.argmax(1).cpu()\n            for p, gt, g in zip(preds, y.cpu(), true_g):\n                g = int(g)\n                group_corr[g] = group_corr.get(g, 0) + int(p == gt)\n                group_cnt[g] = group_cnt.get(g, 0) + 1\n            count += x.size(0)\n    val_loss = total_loss / count\n    worst_acc = min(group_corr[g] / group_cnt[g] for g in group_cnt)\n    return val_loss, worst_acc\n\n\n# Training\nepochs = 10\nfor epoch in range(1, epochs + 1):\n    model.train()\n    running_loss = 0.0\n    for x, y, pg, _ in train_loader:\n        x, y, pg = x.to(device), y.to(device), pg.to(device)\n        out = model(x)\n        losses = F.cross_entropy(out, y, reduction=\"none\")\n        freq = torch.bincount(pg, minlength=k).float()[pg].to(device)\n        loss = (losses / freq).mean()\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n        running_loss += loss.item() * x.size(0)\n    tr_loss = running_loss / len(train_loader.dataset)\n    experiment_data[\"colored_mnist\"][\"losses\"][\"train\"].append(tr_loss)\n    tr_wg = evaluate(train_loader)[1]\n    experiment_data[\"colored_mnist\"][\"metrics\"][\"train\"].append(tr_wg)\n    val_loss, val_wg = evaluate(val_loader)\n    experiment_data[\"colored_mnist\"][\"losses\"][\"val\"].append(val_loss)\n    experiment_data[\"colored_mnist\"][\"metrics\"][\"val\"].append(val_wg)\n    print(\n        f\"Epoch {epoch}: validation_loss = {val_loss:.4f}, worst-group-acc = {val_wg:.4f}\"\n    )\n\n# Final predictions and save\nall_preds, all_gts = [], []\nmodel.eval()\nwith torch.no_grad():\n    for x, y, _, _ in val_loader:\n        x = x.to(device)\n        out = model(x).argmax(1).cpu().numpy()\n        all_preds.extend(out.tolist())\n        all_gts.extend(y.numpy().tolist())\nexperiment_data[\"colored_mnist\"][\"predictions\"] = np.array(all_preds)\nexperiment_data[\"colored_mnist\"][\"ground_truth\"] = np.array(all_gts)\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\nprint(f\"Final worst-group-accuracy: {evaluate(val_loader)[1]:.4f}\")\n", "import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport numpy as np\nimport torch\nimport torch.nn as nn\nfrom torch.utils.data import TensorDataset, DataLoader\n\n# Device setup\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Generate synthetic 2D data with spurious correlation\nnp.random.seed(0)\nn_train, n_test = 10000, 2000\np_train, p_test = 0.9, 0.5\ny_train = np.random.binomial(1, 0.5, n_train)\ns_train = np.random.binomial(1, p_train, n_train)\ny_test = np.random.binomial(1, 0.5, n_test)\ns_test = np.random.binomial(1, p_test, n_test)\nx1_train = np.random.randn(n_train) + (2 * y_train - 1) * 2.0\nx2_train = np.random.randn(n_train) + (2 * s_train - 1) * 2.0\nx1_test = np.random.randn(n_test) + (2 * y_test - 1) * 2.0\nx2_test = np.random.randn(n_test) + (2 * s_test - 1) * 2.0\nX_train = np.stack([x1_train, x2_train], axis=1)\nX_test = np.stack([x1_test, x2_test], axis=1)\nmean, std = X_train.mean(0), X_train.std(0)\nX_train = (X_train - mean) / std\nX_test = (X_test - mean) / std\ng_train = 2 * y_train + s_train\ng_test = 2 * y_test + s_test\n\n# Datasets and loaders\ntrain_dataset = TensorDataset(\n    torch.from_numpy(X_train).float(),\n    torch.from_numpy(y_train).float(),\n    torch.from_numpy(g_train).long(),\n)\ntest_dataset = TensorDataset(\n    torch.from_numpy(X_test).float(),\n    torch.from_numpy(y_test).float(),\n    torch.from_numpy(g_test).long(),\n)\ntrain_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)\ntrain_eval_loader = DataLoader(train_dataset, batch_size=256, shuffle=False)\ntest_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)\n\n\n# Simple logistic regression model\nclass LogisticModel(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.linear = nn.Linear(2, 1)\n\n    def forward(self, x):\n        return self.linear(x)\n\n\n# 1) ERM pre-training\nmodel_erm = LogisticModel().to(device)\noptimizer_erm = torch.optim.SGD(model_erm.parameters(), lr=0.1)\nloss_fn_erm = nn.BCEWithLogitsLoss()\nfor epoch in range(5):\n    model_erm.train()\n    for x_b, y_b, _ in train_loader:\n        x_b, y_b = x_b.to(device), y_b.to(device)\n        optimizer_erm.zero_grad()\n        logits = model_erm(x_b).squeeze()\n        loss = loss_fn_erm(logits, y_b)\n        loss.backward()\n        optimizer_erm.step()\n\n# 2) Extract per-sample gradients then k-means clustering\nwith torch.no_grad():\n    X_dev = torch.from_numpy(X_train).float().to(device)\n    Y_dev = torch.from_numpy(y_train).float().to(device)\n    logits = model_erm(X_dev).squeeze()\n    probs = torch.sigmoid(logits)\n    grads = (probs - Y_dev).unsqueeze(1) * X_dev\n    grads_np = grads.cpu().numpy()\n\n\ndef simple_kmeans(X, n_clusters=4, n_iters=10, seed=0):\n    rng = np.random.RandomState(seed)\n    n_samples, dim = X.shape\n    centers = X[rng.choice(n_samples, n_clusters, replace=False)]\n    labels = np.zeros(n_samples, dtype=int)\n    for _ in range(n_iters):\n        # assign\n        dists = np.linalg.norm(X[:, None, :] - centers[None, :, :], axis=2)\n        labels = dists.argmin(axis=1)\n        # update\n        for k in range(n_clusters):\n            if np.any(labels == k):\n                centers[k] = X[labels == k].mean(axis=0)\n            else:\n                centers[k] = X[rng.choice(n_samples)]\n    return labels\n\n\ncluster_ids = simple_kmeans(grads_np, n_clusters=4, n_iters=20, seed=0)\ncounts = np.bincount(cluster_ids, minlength=4)\ncluster_weights = 1.0 / counts\ncluster_weights = torch.from_numpy(cluster_weights).float().to(device)\n\n# 3) Robust reweighting training\ntrain_dataset2 = TensorDataset(\n    torch.from_numpy(X_train).float(),\n    torch.from_numpy(y_train).float(),\n    torch.from_numpy(cluster_ids).long(),\n)\ntrain_loader2 = DataLoader(train_dataset2, batch_size=128, shuffle=True)\n\n\ndef worst_group_accuracy(preds, labels, groups):\n    accs = []\n    for g in np.unique(groups):\n        mask = groups == g\n        if mask.sum() > 0:\n            accs.append((preds[mask] == labels[mask]).mean())\n    return float(np.min(accs))\n\n\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\nmodel = LogisticModel().to(device)\noptimizer = torch.optim.SGD(model.parameters(), lr=0.1)\nloss_fn = nn.BCEWithLogitsLoss(reduction=\"none\")\n\nfor epoch in range(1, 6):\n    # training\n    model.train()\n    train_loss_sum = 0.0\n    for x_b, y_b, c_b in train_loader2:\n        x_b, y_b, c_b = x_b.to(device), y_b.to(device), c_b.to(device)\n        optimizer.zero_grad()\n        logits = model(x_b).squeeze()\n        loss = loss_fn(logits, y_b)\n        weighted = (loss * cluster_weights[c_b]).mean()\n        weighted.backward()\n        optimizer.step()\n        train_loss_sum += weighted.item() * x_b.size(0)\n    train_loss = train_loss_sum / len(train_dataset2)\n\n    # evaluation\n    model.eval()\n    with torch.no_grad():\n        # train worst-group acc\n        all_p, all_y, all_g = [], [], []\n        for x_b, y_b, g_b in train_eval_loader:\n            x_b, y_b = x_b.to(device), y_b.to(device)\n            preds = (torch.sigmoid(model(x_b).squeeze()) > 0.5).long().cpu().numpy()\n            all_p.append(preds)\n            all_y.append(y_b.cpu().numpy())\n            all_g.append(g_b.numpy())\n        train_p = np.concatenate(all_p)\n        train_y = np.concatenate(all_y)\n        train_g = np.concatenate(all_g)\n        train_wg = worst_group_accuracy(train_p, train_y, train_g)\n\n        # validation\n        val_loss_sum, all_p, all_y, all_g = 0.0, [], [], []\n        for x_b, y_b, g_b in test_loader:\n            x_b, y_b = x_b.to(device), y_b.to(device)\n            logits = model(x_b).squeeze()\n            loss = loss_fn(logits, y_b).mean()\n            val_loss_sum += loss.item() * x_b.size(0)\n            preds = (torch.sigmoid(logits) > 0.5).long().cpu().numpy()\n            all_p.append(preds)\n            all_y.append(y_b.cpu().numpy())\n            all_g.append(g_b.numpy())\n        val_loss = val_loss_sum / len(test_dataset)\n        val_p = np.concatenate(all_p)\n        val_y = np.concatenate(all_y)\n        val_g = np.concatenate(all_g)\n        val_wg = worst_group_accuracy(val_p, val_y, val_g)\n\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(train_loss)\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(val_loss)\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_wg)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_wg)\n\n# save final predictions\nexperiment_data[\"synthetic\"][\"predictions\"] = val_p\nexperiment_data[\"synthetic\"][\"ground_truth\"] = val_y\n\n# save all experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "# Set random seed\nimport random\nimport numpy as np\nimport torch\n\nseed = 0\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport numpy as np\nimport torch\nimport torch.nn as nn\nfrom torch.utils.data import DataLoader, Dataset\n\n# Device setup\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Create synthetic dataset with spurious feature\nnp.random.seed(0)\nN, d = 2000, 5\ny = np.random.binomial(1, 0.5, size=N)\nX_cont = np.random.randn(N, d) + 2 * y.reshape(-1, 1)\nspurious_corr = 0.95\nrnd = np.random.rand(N)\ns = np.where(rnd < spurious_corr, y, 1 - y)\nX = np.concatenate([X_cont, s.reshape(-1, 1)], axis=1)\n\n# Split indices\nidxs = np.arange(N)\nnp.random.shuffle(idxs)\ntrain_idx, val_idx, test_idx = idxs[:1000], idxs[1000:1500], idxs[1500:]\n\n# Normalize continuous features\nmean = X[train_idx, :d].mean(axis=0)\nstd = X[train_idx, :d].std(axis=0) + 1e-6\nX_norm = X.copy()\nX_norm[:, :d] = (X_norm[:, :d] - mean) / std\n\n# Prepare splits\nsplits = {}\nsplits[\"train\"] = (X_norm[train_idx], y[train_idx], s[train_idx])\nsplits[\"val\"] = (X_norm[val_idx], y[val_idx], s[val_idx])\nsplits[\"test\"] = (X_norm[test_idx], y[test_idx], s[test_idx])\n\n\nclass SyntheticDataset(Dataset):\n    def __init__(self, X, y, g):\n        self.X = torch.tensor(X, dtype=torch.float32)\n        self.y = torch.tensor(y, dtype=torch.long)\n        self.g = torch.tensor(g, dtype=torch.long)\n\n    def __len__(self):\n        return len(self.y)\n\n    def __getitem__(self, idx):\n        return {\n            \"features\": self.X[idx],\n            \"label\": self.y[idx],\n            \"group\": self.g[idx],\n            \"idx\": idx,\n        }\n\n\n# DataLoaders\ntrain_ds = SyntheticDataset(*splits[\"train\"])\nval_ds = SyntheticDataset(*splits[\"val\"])\ntest_ds = SyntheticDataset(*splits[\"test\"])\ntrain_loader = DataLoader(train_ds, batch_size=64, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=256, shuffle=False)\ntest_loader = DataLoader(test_ds, batch_size=256, shuffle=False)\ncluster_loader = DataLoader(train_ds, batch_size=1, shuffle=False)\n\n\n# Simple NumPy k-means implementation\ndef kmeans_np(X, n_clusters=2, n_iters=10):\n    rng = np.random.RandomState(0)\n    N, D = X.shape\n    init_idxs = rng.choice(N, n_clusters, replace=False)\n    centroids = X[init_idxs].copy()\n    labels = np.zeros(N, dtype=int)\n    for _ in range(n_iters):\n        dists = np.sum((X[:, None, :] - centroids[None, :, :]) ** 2, axis=2)\n        new_labels = np.argmin(dists, axis=1)\n        if np.all(new_labels == labels):\n            break\n        labels = new_labels\n        for k in range(n_clusters):\n            pts = X[labels == k]\n            if len(pts) > 0:\n                centroids[k] = pts.mean(axis=0)\n            else:\n                centroids[k] = X[rng.randint(N)]\n    return labels\n\n\n# Model definition\nclass MLP(nn.Module):\n    def __init__(self, inp_dim, hid=32):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(inp_dim, hid), nn.ReLU(), nn.Linear(hid, hid), nn.ReLU()\n        )\n        self.fc = nn.Linear(hid, 2)\n\n    def forward(self, x):\n        return self.fc(self.net(x))\n\n\nmodel = MLP(d + 1).to(device)\ncriterion = nn.CrossEntropyLoss(reduction=\"none\")\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\n\n# Experiment storage\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n\n# Evaluation helper\ndef evaluate(loader):\n    loss_sum = 0.0\n    correct = {0: 0, 1: 0}\n    total = {0: 0, 1: 0}\n    with torch.no_grad():\n        for batch in loader:\n            batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n            x, yb, grp = batch[\"features\"], batch[\"label\"], batch[\"group\"]\n            out = model(x)\n            losses = criterion(out, yb)\n            loss_sum += losses.sum().item()\n            preds = out.argmax(1)\n            for g in [0, 1]:\n                mask = grp == g\n                total[g] += mask.sum().item()\n                if mask.sum().item() > 0:\n                    correct[g] += (preds[mask] == yb[mask]).sum().item()\n    wg_acc = min(correct[g] / total[g] if total[g] > 0 else 0.0 for g in [0, 1])\n    return loss_sum, wg_acc\n\n\n# Training loop with warmup + gradient clustering\nwarmup_epochs = 1\ntrain_epochs = 5\ntotal_epochs = warmup_epochs + train_epochs\nsample_weights = None\n\nfor epoch in range(total_epochs):\n    model.train()\n    for batch in train_loader:\n        batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n        x, yb, idxb = batch[\"features\"], batch[\"label\"], batch[\"idx\"]\n        out = model(x)\n        losses = criterion(out, yb)\n        if epoch >= warmup_epochs and sample_weights is not None:\n            sw = sample_weights[idxb]\n            loss = (losses * sw).mean()\n        else:\n            loss = losses.mean()\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n    # Cluster gradients after warmup\n    if epoch == warmup_epochs - 1:\n        model.eval()\n        grads = []\n        for sample in cluster_loader:\n            batch = {k: v.to(device) for k, v in sample.items() if torch.is_tensor(v)}\n            optimizer.zero_grad()\n            out = model(batch[\"features\"])\n            loss_i = criterion(out, batch[\"label\"]).mean()\n            loss_i.backward()\n            g = model.fc.weight.grad.detach().cpu().view(-1).numpy()\n            grads.append(g)\n        grads = np.stack(grads)\n        labels = kmeans_np(grads, n_clusters=2, n_iters=10)\n        counts = np.bincount(labels, minlength=2)\n        sw_arr = np.array([1.0 / counts[lab] for lab in labels], dtype=np.float32)\n        sample_weights = torch.tensor(sw_arr, device=device)\n    # Evaluate\n    train_loss, train_wg = evaluate(train_loader)\n    val_loss, val_wg = evaluate(val_loader)\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(train_loss / len(train_ds))\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(val_loss / len(val_ds))\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_wg)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_wg)\n\n# Final test predictions\nmodel.eval()\npreds, truths = [], []\nwith torch.no_grad():\n    for batch in test_loader:\n        batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n        out = model(batch[\"features\"])\n        preds.extend(out.argmax(1).cpu().numpy().tolist())\n        truths.extend(batch[\"label\"].cpu().numpy().tolist())\nexperiment_data[\"synthetic\"][\"predictions\"] = np.array(preds)\nexperiment_data[\"synthetic\"][\"ground_truth\"] = np.array(truths)\n\n# Save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "# Set random seed\nimport random\nimport numpy as np\nimport torch\n\nseed = 1\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport numpy as np\nimport torch\nimport torch.nn as nn\nfrom torch.utils.data import DataLoader, Dataset\n\n# Device setup\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Create synthetic dataset with spurious feature\nnp.random.seed(0)\nN, d = 2000, 5\ny = np.random.binomial(1, 0.5, size=N)\nX_cont = np.random.randn(N, d) + 2 * y.reshape(-1, 1)\nspurious_corr = 0.95\nrnd = np.random.rand(N)\ns = np.where(rnd < spurious_corr, y, 1 - y)\nX = np.concatenate([X_cont, s.reshape(-1, 1)], axis=1)\n\n# Split indices\nidxs = np.arange(N)\nnp.random.shuffle(idxs)\ntrain_idx, val_idx, test_idx = idxs[:1000], idxs[1000:1500], idxs[1500:]\n\n# Normalize continuous features\nmean = X[train_idx, :d].mean(axis=0)\nstd = X[train_idx, :d].std(axis=0) + 1e-6\nX_norm = X.copy()\nX_norm[:, :d] = (X_norm[:, :d] - mean) / std\n\n# Prepare splits\nsplits = {}\nsplits[\"train\"] = (X_norm[train_idx], y[train_idx], s[train_idx])\nsplits[\"val\"] = (X_norm[val_idx], y[val_idx], s[val_idx])\nsplits[\"test\"] = (X_norm[test_idx], y[test_idx], s[test_idx])\n\n\nclass SyntheticDataset(Dataset):\n    def __init__(self, X, y, g):\n        self.X = torch.tensor(X, dtype=torch.float32)\n        self.y = torch.tensor(y, dtype=torch.long)\n        self.g = torch.tensor(g, dtype=torch.long)\n\n    def __len__(self):\n        return len(self.y)\n\n    def __getitem__(self, idx):\n        return {\n            \"features\": self.X[idx],\n            \"label\": self.y[idx],\n            \"group\": self.g[idx],\n            \"idx\": idx,\n        }\n\n\n# DataLoaders\ntrain_ds = SyntheticDataset(*splits[\"train\"])\nval_ds = SyntheticDataset(*splits[\"val\"])\ntest_ds = SyntheticDataset(*splits[\"test\"])\ntrain_loader = DataLoader(train_ds, batch_size=64, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=256, shuffle=False)\ntest_loader = DataLoader(test_ds, batch_size=256, shuffle=False)\ncluster_loader = DataLoader(train_ds, batch_size=1, shuffle=False)\n\n\n# Simple NumPy k-means implementation\ndef kmeans_np(X, n_clusters=2, n_iters=10):\n    rng = np.random.RandomState(0)\n    N, D = X.shape\n    init_idxs = rng.choice(N, n_clusters, replace=False)\n    centroids = X[init_idxs].copy()\n    labels = np.zeros(N, dtype=int)\n    for _ in range(n_iters):\n        dists = np.sum((X[:, None, :] - centroids[None, :, :]) ** 2, axis=2)\n        new_labels = np.argmin(dists, axis=1)\n        if np.all(new_labels == labels):\n            break\n        labels = new_labels\n        for k in range(n_clusters):\n            pts = X[labels == k]\n            if len(pts) > 0:\n                centroids[k] = pts.mean(axis=0)\n            else:\n                centroids[k] = X[rng.randint(N)]\n    return labels\n\n\n# Model definition\nclass MLP(nn.Module):\n    def __init__(self, inp_dim, hid=32):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(inp_dim, hid), nn.ReLU(), nn.Linear(hid, hid), nn.ReLU()\n        )\n        self.fc = nn.Linear(hid, 2)\n\n    def forward(self, x):\n        return self.fc(self.net(x))\n\n\nmodel = MLP(d + 1).to(device)\ncriterion = nn.CrossEntropyLoss(reduction=\"none\")\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\n\n# Experiment storage\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n\n# Evaluation helper\ndef evaluate(loader):\n    loss_sum = 0.0\n    correct = {0: 0, 1: 0}\n    total = {0: 0, 1: 0}\n    with torch.no_grad():\n        for batch in loader:\n            batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n            x, yb, grp = batch[\"features\"], batch[\"label\"], batch[\"group\"]\n            out = model(x)\n            losses = criterion(out, yb)\n            loss_sum += losses.sum().item()\n            preds = out.argmax(1)\n            for g in [0, 1]:\n                mask = grp == g\n                total[g] += mask.sum().item()\n                if mask.sum().item() > 0:\n                    correct[g] += (preds[mask] == yb[mask]).sum().item()\n    wg_acc = min(correct[g] / total[g] if total[g] > 0 else 0.0 for g in [0, 1])\n    return loss_sum, wg_acc\n\n\n# Training loop with warmup + gradient clustering\nwarmup_epochs = 1\ntrain_epochs = 5\ntotal_epochs = warmup_epochs + train_epochs\nsample_weights = None\n\nfor epoch in range(total_epochs):\n    model.train()\n    for batch in train_loader:\n        batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n        x, yb, idxb = batch[\"features\"], batch[\"label\"], batch[\"idx\"]\n        out = model(x)\n        losses = criterion(out, yb)\n        if epoch >= warmup_epochs and sample_weights is not None:\n            sw = sample_weights[idxb]\n            loss = (losses * sw).mean()\n        else:\n            loss = losses.mean()\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n    # Cluster gradients after warmup\n    if epoch == warmup_epochs - 1:\n        model.eval()\n        grads = []\n        for sample in cluster_loader:\n            batch = {k: v.to(device) for k, v in sample.items() if torch.is_tensor(v)}\n            optimizer.zero_grad()\n            out = model(batch[\"features\"])\n            loss_i = criterion(out, batch[\"label\"]).mean()\n            loss_i.backward()\n            g = model.fc.weight.grad.detach().cpu().view(-1).numpy()\n            grads.append(g)\n        grads = np.stack(grads)\n        labels = kmeans_np(grads, n_clusters=2, n_iters=10)\n        counts = np.bincount(labels, minlength=2)\n        sw_arr = np.array([1.0 / counts[lab] for lab in labels], dtype=np.float32)\n        sample_weights = torch.tensor(sw_arr, device=device)\n    # Evaluate\n    train_loss, train_wg = evaluate(train_loader)\n    val_loss, val_wg = evaluate(val_loader)\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(train_loss / len(train_ds))\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(val_loss / len(val_ds))\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_wg)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_wg)\n\n# Final test predictions\nmodel.eval()\npreds, truths = [], []\nwith torch.no_grad():\n    for batch in test_loader:\n        batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n        out = model(batch[\"features\"])\n        preds.extend(out.argmax(1).cpu().numpy().tolist())\n        truths.extend(batch[\"label\"].cpu().numpy().tolist())\nexperiment_data[\"synthetic\"][\"predictions\"] = np.array(preds)\nexperiment_data[\"synthetic\"][\"ground_truth\"] = np.array(truths)\n\n# Save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "# Set random seed\nimport random\nimport numpy as np\nimport torch\n\nseed = 2\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport numpy as np\nimport torch\nimport torch.nn as nn\nfrom torch.utils.data import DataLoader, Dataset\n\n# Device setup\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Create synthetic dataset with spurious feature\nnp.random.seed(0)\nN, d = 2000, 5\ny = np.random.binomial(1, 0.5, size=N)\nX_cont = np.random.randn(N, d) + 2 * y.reshape(-1, 1)\nspurious_corr = 0.95\nrnd = np.random.rand(N)\ns = np.where(rnd < spurious_corr, y, 1 - y)\nX = np.concatenate([X_cont, s.reshape(-1, 1)], axis=1)\n\n# Split indices\nidxs = np.arange(N)\nnp.random.shuffle(idxs)\ntrain_idx, val_idx, test_idx = idxs[:1000], idxs[1000:1500], idxs[1500:]\n\n# Normalize continuous features\nmean = X[train_idx, :d].mean(axis=0)\nstd = X[train_idx, :d].std(axis=0) + 1e-6\nX_norm = X.copy()\nX_norm[:, :d] = (X_norm[:, :d] - mean) / std\n\n# Prepare splits\nsplits = {}\nsplits[\"train\"] = (X_norm[train_idx], y[train_idx], s[train_idx])\nsplits[\"val\"] = (X_norm[val_idx], y[val_idx], s[val_idx])\nsplits[\"test\"] = (X_norm[test_idx], y[test_idx], s[test_idx])\n\n\nclass SyntheticDataset(Dataset):\n    def __init__(self, X, y, g):\n        self.X = torch.tensor(X, dtype=torch.float32)\n        self.y = torch.tensor(y, dtype=torch.long)\n        self.g = torch.tensor(g, dtype=torch.long)\n\n    def __len__(self):\n        return len(self.y)\n\n    def __getitem__(self, idx):\n        return {\n            \"features\": self.X[idx],\n            \"label\": self.y[idx],\n            \"group\": self.g[idx],\n            \"idx\": idx,\n        }\n\n\n# DataLoaders\ntrain_ds = SyntheticDataset(*splits[\"train\"])\nval_ds = SyntheticDataset(*splits[\"val\"])\ntest_ds = SyntheticDataset(*splits[\"test\"])\ntrain_loader = DataLoader(train_ds, batch_size=64, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=256, shuffle=False)\ntest_loader = DataLoader(test_ds, batch_size=256, shuffle=False)\ncluster_loader = DataLoader(train_ds, batch_size=1, shuffle=False)\n\n\n# Simple NumPy k-means implementation\ndef kmeans_np(X, n_clusters=2, n_iters=10):\n    rng = np.random.RandomState(0)\n    N, D = X.shape\n    init_idxs = rng.choice(N, n_clusters, replace=False)\n    centroids = X[init_idxs].copy()\n    labels = np.zeros(N, dtype=int)\n    for _ in range(n_iters):\n        dists = np.sum((X[:, None, :] - centroids[None, :, :]) ** 2, axis=2)\n        new_labels = np.argmin(dists, axis=1)\n        if np.all(new_labels == labels):\n            break\n        labels = new_labels\n        for k in range(n_clusters):\n            pts = X[labels == k]\n            if len(pts) > 0:\n                centroids[k] = pts.mean(axis=0)\n            else:\n                centroids[k] = X[rng.randint(N)]\n    return labels\n\n\n# Model definition\nclass MLP(nn.Module):\n    def __init__(self, inp_dim, hid=32):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(inp_dim, hid), nn.ReLU(), nn.Linear(hid, hid), nn.ReLU()\n        )\n        self.fc = nn.Linear(hid, 2)\n\n    def forward(self, x):\n        return self.fc(self.net(x))\n\n\nmodel = MLP(d + 1).to(device)\ncriterion = nn.CrossEntropyLoss(reduction=\"none\")\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\n\n# Experiment storage\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n\n# Evaluation helper\ndef evaluate(loader):\n    loss_sum = 0.0\n    correct = {0: 0, 1: 0}\n    total = {0: 0, 1: 0}\n    with torch.no_grad():\n        for batch in loader:\n            batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n            x, yb, grp = batch[\"features\"], batch[\"label\"], batch[\"group\"]\n            out = model(x)\n            losses = criterion(out, yb)\n            loss_sum += losses.sum().item()\n            preds = out.argmax(1)\n            for g in [0, 1]:\n                mask = grp == g\n                total[g] += mask.sum().item()\n                if mask.sum().item() > 0:\n                    correct[g] += (preds[mask] == yb[mask]).sum().item()\n    wg_acc = min(correct[g] / total[g] if total[g] > 0 else 0.0 for g in [0, 1])\n    return loss_sum, wg_acc\n\n\n# Training loop with warmup + gradient clustering\nwarmup_epochs = 1\ntrain_epochs = 5\ntotal_epochs = warmup_epochs + train_epochs\nsample_weights = None\n\nfor epoch in range(total_epochs):\n    model.train()\n    for batch in train_loader:\n        batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n        x, yb, idxb = batch[\"features\"], batch[\"label\"], batch[\"idx\"]\n        out = model(x)\n        losses = criterion(out, yb)\n        if epoch >= warmup_epochs and sample_weights is not None:\n            sw = sample_weights[idxb]\n            loss = (losses * sw).mean()\n        else:\n            loss = losses.mean()\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n    # Cluster gradients after warmup\n    if epoch == warmup_epochs - 1:\n        model.eval()\n        grads = []\n        for sample in cluster_loader:\n            batch = {k: v.to(device) for k, v in sample.items() if torch.is_tensor(v)}\n            optimizer.zero_grad()\n            out = model(batch[\"features\"])\n            loss_i = criterion(out, batch[\"label\"]).mean()\n            loss_i.backward()\n            g = model.fc.weight.grad.detach().cpu().view(-1).numpy()\n            grads.append(g)\n        grads = np.stack(grads)\n        labels = kmeans_np(grads, n_clusters=2, n_iters=10)\n        counts = np.bincount(labels, minlength=2)\n        sw_arr = np.array([1.0 / counts[lab] for lab in labels], dtype=np.float32)\n        sample_weights = torch.tensor(sw_arr, device=device)\n    # Evaluate\n    train_loss, train_wg = evaluate(train_loader)\n    val_loss, val_wg = evaluate(val_loader)\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(train_loss / len(train_ds))\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(val_loss / len(val_ds))\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_wg)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_wg)\n\n# Final test predictions\nmodel.eval()\npreds, truths = [], []\nwith torch.no_grad():\n    for batch in test_loader:\n        batch = {k: v.to(device) for k, v in batch.items() if torch.is_tensor(v)}\n        out = model(batch[\"features\"])\n        preds.extend(out.argmax(1).cpu().numpy().tolist())\n        truths.extend(batch[\"label\"].cpu().numpy().tolist())\nexperiment_data[\"synthetic\"][\"predictions\"] = np.array(preds)\nexperiment_data[\"synthetic\"][\"ground_truth\"] = np.array(truths)\n\n# Save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "# plotting aggregation code"], "term_out": ["['Traceback (most recent call last):\\n  File \"runfile.py\", line 10, in\n<module>\\n    from sklearn.cluster import KMeans\\nModuleNotFoundError: No module\nnamed \\'sklearn\\'\\n', 'Execution time: a moment seconds (time limit is an\nhour).']", "['Traceback (most recent call last):\\n  File \"runfile.py\", line 12, in\n<module>\\n    from sklearn.cluster import KMeans\\nModuleNotFoundError: No module\nnamed \\'sklearn\\'\\n', 'Execution time: a second seconds (time limit is an\nhour).']", "['Traceback (most recent call last):\\n  File \"runfile.py\", line 10, in\n<module>\\n    from sklearn.cluster import KMeans\\nModuleNotFoundError: No module\nnamed \\'sklearn\\'\\n', 'Execution time: a moment seconds (time limit is an\nhour).']", "['Using device: cuda', '\\n', 'Epoch 0: validation_loss = 268.8303', '\\n', 'Epoch\n1: validation_loss = 235.9364', '\\n', 'Epoch 2: validation_loss = 228.1427',\n'\\n', 'Epoch 3: validation_loss = 226.1110', '\\n', 'Epoch 4: validation_loss =\n225.3080', '\\n', 'Epoch 5: validation_loss = 224.7263', '\\n', 'Execution time: 3\nseconds seconds (time limit is an hour).']", "['Traceback (most recent call last):\\n  File \"runfile.py\", line 12, in\n<module>\\n    from sklearn.cluster import KMeans\\nModuleNotFoundError: No module\nnamed \\'sklearn\\'\\n', 'Execution time: a second seconds (time limit is an\nhour).']", "['Using device: cuda', '\\n', 'Epoch 1: validation_loss = 1.1072', '\\n', 'Epoch\n2: validation_loss = 1.1060', '\\n', 'Epoch 3: validation_loss = 1.1048', '\\n',\n'Epoch 4: validation_loss = 1.1036', '\\n', 'Epoch 5: validation_loss = 1.1024',\n'\\n', 'Execution time: 3 seconds seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Epoch 0: validation_loss = 294.6205', '\\n', 'Epoch\n1: validation_loss = 262.8275', '\\n', 'Epoch 2: validation_loss = 255.4357',\n'\\n', 'Epoch 3: validation_loss = 253.5172', '\\n', 'Epoch 4: validation_loss =\n252.7590', '\\n', 'Epoch 5: validation_loss = 252.2090', '\\n', 'Execution time: 3\nseconds seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Epoch 0: validation_loss = 318.4648', '\\n', 'Epoch\n1: validation_loss = 288.2809', '\\n', 'Epoch 2: validation_loss = 281.2924',\n'\\n', 'Epoch 3: validation_loss = 279.4552', '\\n', 'Epoch 4: validation_loss =\n278.7127', '\\n', 'Epoch 5: validation_loss = 278.1556', '\\n', 'Execution time: 3\nseconds seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Epoch 0: validation_loss = 300.2346', '\\n', 'Epoch\n1: validation_loss = 269.3689', '\\n', 'Epoch 2: validation_loss = 262.2577',\n'\\n', 'Epoch 3: validation_loss = 259.5285', '\\n', 'Epoch 4: validation_loss =\n255.6374', '\\n', 'Epoch 5: validation_loss = 249.2817', '\\n', 'Execution time: 3\nseconds seconds (time limit is an hour).']", ""], "analysis": ["The script failed immediately with ModuleNotFoundError: No module named\n'sklearn', indicating that the scikit-learn dependency is not installed. To fix\nthis, add scikit-learn to the environment (e.g., pip install scikit-learn or\ninclude it in the project requirements) or implement the KMeans clustering using\na PyTorch-native solution.", "The script failed immediately with ModuleNotFoundError: No module named\n'sklearn'. This indicates that scikit-learn is not installed in the environment.\nTo fix, add scikit-learn as a dependency (e.g., pip install scikit-learn) or\nreplace KMeans import with an alternative clustering implementation available in\nthe environment.", "The execution failed due to a ModuleNotFoundError for sklearn; scikit-learn is\nnot installed in the environment. To fix, install scikit-learn (e.g., add `pip\ninstall scikit-learn` to setup or requirements) or replace KMeans usage with a\ncompatible clustering implementation available in the environment.", "", "The script fails immediately on importing sklearn.cluster.KMeans because scikit-\nlearn is not installed in the environment. To fix this, install scikit-learn\n(e.g., pip install scikit-learn) or swap to an alternative KMeans implementation\navailable in PyTorch or another installed library.", "In the robust re-weighting stage we directly use cluster_weights = 1.0/counts,\nso for a balanced 10k-sample dataset with 4 clusters each of size ~2.5k, each\nper-sample weight is only ~0.0004. When you multiply your losses by these tiny\nweights and then take a mean, the resulting gradients are effectively zero, so\nthe new model barely learns and validation loss remains >1.1 with almost no\nimprovement.   Proposed fixes: 1) Renormalize your cluster_weights so that their\nmean (or sum) is 1. For example:      cluster_weights = (1.0/counts) *\n(len(train_dataset)/n_clusters)    This yields weights \u22481 for balanced clusters\nand scales gradients to the right magnitude.  2) (Optional) If you want to\nbootstrap from your ERM pre-trained model rather than a fresh random init, start\nrobust training from model_erm to get faster convergence.  3) Also consider\nprinting your worst-group accuracies each epoch (they are recorded but not\nprinted) so you can monitor group-robust performance directly.", "", "", "", ""], "exc_type": ["ModuleNotFoundError", "ModuleNotFoundError", "ModuleNotFoundError", null, "ModuleNotFoundError", null, null, null, null, null], "exc_info": [{"args": ["No module named 'sklearn'"], "name": "sklearn", "msg": "No module named 'sklearn'"}, {"args": ["No module named 'sklearn'"], "name": "sklearn", "msg": "No module named 'sklearn'"}, {"args": ["No module named 'sklearn'"], "name": "sklearn", "msg": "No module named 'sklearn'"}, null, {"args": ["No module named 'sklearn'"], "name": "sklearn", "msg": "No module named 'sklearn'"}, null, null, null, null, null], "exc_stack": [[["/data/chenhui/AI-Scientist-v2/ai_scientist/treesearch/interpreter.py", 144, "_run_session", "exec(compile(code, self.agent_file_name, \"exec\"), global_scope)"], ["runfile.py", 10, "<module>", "from sklearn.cluster import KMeans"]], [["/data/chenhui/AI-Scientist-v2/ai_scientist/treesearch/interpreter.py", 144, "_run_session", "exec(compile(code, self.agent_file_name, \"exec\"), global_scope)"], ["runfile.py", 12, "<module>", "from sklearn.cluster import KMeans"]], [["/data/chenhui/AI-Scientist-v2/ai_scientist/treesearch/interpreter.py", 144, "_run_session", "exec(compile(code, self.agent_file_name, \"exec\"), global_scope)"], ["runfile.py", 10, "<module>", "from sklearn.cluster import KMeans"]], null, [["/data/chenhui/AI-Scientist-v2/ai_scientist/treesearch/interpreter.py", 144, "_run_session", "exec(compile(code, self.agent_file_name, \"exec\"), global_scope)"], ["runfile.py", 12, "<module>", "from sklearn.cluster import KMeans"]], null, null, null, null, null], "exp_name": "0-run", "metrics": [{"metric_names": [{"metric_name": "value", "lower_is_better": true, "description": "", "data": [{"dataset_name": "default", "final_value": null, "best_value": null}]}]}, {"metric_names": [{"metric_name": "value", "lower_is_better": true, "description": "", "data": [{"dataset_name": "default", "final_value": null, "best_value": null}]}]}, {"metric_names": [{"metric_name": "value", "lower_is_better": true, "description": "", "data": [{"dataset_name": "default", "final_value": null, "best_value": null}]}]}, {"metric_names": [{"metric_name": "train loss", "lower_is_better": true, "description": "Loss on the training dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.4523, "best_value": 0.4523}]}, {"metric_name": "train accuracy", "lower_is_better": false, "description": "Accuracy on the training dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.9942, "best_value": 0.9942}]}, {"metric_name": "validation loss", "lower_is_better": true, "description": "Loss on the validation dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.4495, "best_value": 0.4495}]}, {"metric_name": "validation accuracy", "lower_is_better": false, "description": "Accuracy on the validation dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.9916, "best_value": 0.9916}]}, {"metric_name": "test accuracy", "lower_is_better": false, "description": "Accuracy on the test dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.986, "best_value": 0.986}]}]}, {"metric_names": [{"metric_name": "value", "lower_is_better": true, "description": "", "data": [{"dataset_name": "default", "final_value": null, "best_value": null}]}]}, {"metric_names": [{"metric_name": "train worst-group accuracy", "lower_is_better": false, "description": "Worst-group accuracy on the training set", "data": [{"dataset_name": "synthetic", "final_value": 0.0, "best_value": 0.0}]}, {"metric_name": "validation worst-group accuracy", "lower_is_better": false, "description": "Worst-group accuracy on the validation set", "data": [{"dataset_name": "synthetic", "final_value": 0.0, "best_value": 0.0}]}, {"metric_name": "train loss", "lower_is_better": true, "description": "Training loss", "data": [{"dataset_name": "synthetic", "final_value": 0.0004, "best_value": 0.0004}]}, {"metric_name": "validation loss", "lower_is_better": true, "description": "Validation loss", "data": [{"dataset_name": "synthetic", "final_value": 1.1024, "best_value": 1.1024}]}]}, {"metric_names": [{"metric_name": "train loss", "lower_is_better": true, "description": "Loss on the training dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.5028, "best_value": 0.5028}]}, {"metric_name": "train accuracy", "lower_is_better": false, "description": "Accuracy on the training dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.9884, "best_value": 0.9884}]}, {"metric_name": "validation loss", "lower_is_better": true, "description": "Loss on the validation dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.5044, "best_value": 0.5044}]}, {"metric_name": "validation accuracy", "lower_is_better": false, "description": "Accuracy on the validation dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.9885, "best_value": 0.9885}]}, {"metric_name": "test accuracy", "lower_is_better": false, "description": "Accuracy on the test dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.988, "best_value": 0.988}]}]}, {"metric_names": [{"metric_name": "train loss", "lower_is_better": true, "description": "Loss on the training set", "data": [{"dataset_name": "synthetic", "final_value": 0.5523, "best_value": 0.5523}]}, {"metric_name": "train accuracy", "lower_is_better": false, "description": "Accuracy on the training set", "data": [{"dataset_name": "synthetic", "final_value": 0.913, "best_value": 0.913}]}, {"metric_name": "validation loss", "lower_is_better": true, "description": "Loss on the validation set", "data": [{"dataset_name": "synthetic", "final_value": 0.5563, "best_value": 0.5563}]}, {"metric_name": "validation accuracy", "lower_is_better": false, "description": "Accuracy on the validation set", "data": [{"dataset_name": "synthetic", "final_value": 0.9275, "best_value": 0.9275}]}, {"metric_name": "test accuracy", "lower_is_better": false, "description": "Accuracy on the test set", "data": [{"dataset_name": "synthetic", "final_value": 0.964, "best_value": 0.964}]}]}, {"metric_names": [{"metric_name": "train loss", "lower_is_better": true, "description": "Training loss on the synthetic dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.4936, "best_value": 0.4936}]}, {"metric_name": "train accuracy", "lower_is_better": false, "description": "Training accuracy on the synthetic dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.8923, "best_value": 0.8923}]}, {"metric_name": "validation loss", "lower_is_better": true, "description": "Validation loss on the synthetic dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.4986, "best_value": 0.4986}]}, {"metric_name": "validation accuracy", "lower_is_better": false, "description": "Validation accuracy on the synthetic dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.8702, "best_value": 0.8702}]}, {"metric_name": "test accuracy", "lower_is_better": false, "description": "Test accuracy on the synthetic dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.944, "best_value": 0.944}]}]}, {"metric_names": [{"metric_name": "value", "lower_is_better": true, "description": "", "data": [{"dataset_name": "default", "final_value": null, "best_value": null}]}]}], "is_best_node": [false, false, false, true, false, false, false, false, false, false], "plots": [[], [], [], ["../../logs/0-run/experiment_results/experiment_6d7f38df3e6b47049b7e197e63eb519c_proc_4194301/synthetic_class_distribution.png", "../../logs/0-run/experiment_results/experiment_6d7f38df3e6b47049b7e197e63eb519c_proc_4194301/synthetic_loss_curves.png", "../../logs/0-run/experiment_results/experiment_6d7f38df3e6b47049b7e197e63eb519c_proc_4194301/synthetic_wg_accuracy_curves.png"], [], [], ["../../logs/0-run/experiment_results/experiment_f2502cda9c434cd0a2df81e1d471f9a3_proc_4194300/synthetic_class_distribution.png", "../../logs/0-run/experiment_results/experiment_f2502cda9c434cd0a2df81e1d471f9a3_proc_4194300/synthetic_loss_curves.png", "../../logs/0-run/experiment_results/experiment_f2502cda9c434cd0a2df81e1d471f9a3_proc_4194300/synthetic_wg_accuracy_curves.png"], ["../../logs/0-run/experiment_results/experiment_763d4f6c26f84e40a5dfc2995da55e62_proc_4194299/synthetic_class_distribution.png", "../../logs/0-run/experiment_results/experiment_763d4f6c26f84e40a5dfc2995da55e62_proc_4194299/synthetic_loss_curves.png", "../../logs/0-run/experiment_results/experiment_763d4f6c26f84e40a5dfc2995da55e62_proc_4194299/synthetic_wg_accuracy_curves.png"], ["../../logs/0-run/experiment_results/experiment_cfffc902aaa84d0caed31d045775cadb_proc_4194301/synthetic_class_distribution.png", "../../logs/0-run/experiment_results/experiment_cfffc902aaa84d0caed31d045775cadb_proc_4194301/synthetic_loss_curves.png", "../../logs/0-run/experiment_results/experiment_cfffc902aaa84d0caed31d045775cadb_proc_4194301/synthetic_wg_accuracy_curves.png"], ["../../logs/0-run/experiment_results/seed_aggregation_25890277eb35452f89e51325a41a91c3/synthetic_loss_curves_mean_se.png", "../../logs/0-run/experiment_results/seed_aggregation_25890277eb35452f89e51325a41a91c3/synthetic_class_distribution_mean_se.png", "../../logs/0-run/experiment_results/seed_aggregation_25890277eb35452f89e51325a41a91c3/synthetic_wg_accuracy_curves_mean_se.png"]], "plot_paths": [[], [], [], ["experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_6d7f38df3e6b47049b7e197e63eb519c_proc_4194301/synthetic_class_distribution.png", "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_6d7f38df3e6b47049b7e197e63eb519c_proc_4194301/synthetic_loss_curves.png", "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_6d7f38df3e6b47049b7e197e63eb519c_proc_4194301/synthetic_wg_accuracy_curves.png"], [], [], ["experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_f2502cda9c434cd0a2df81e1d471f9a3_proc_4194300/synthetic_class_distribution.png", "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_f2502cda9c434cd0a2df81e1d471f9a3_proc_4194300/synthetic_loss_curves.png", "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_f2502cda9c434cd0a2df81e1d471f9a3_proc_4194300/synthetic_wg_accuracy_curves.png"], ["experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_763d4f6c26f84e40a5dfc2995da55e62_proc_4194299/synthetic_class_distribution.png", "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_763d4f6c26f84e40a5dfc2995da55e62_proc_4194299/synthetic_loss_curves.png", "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_763d4f6c26f84e40a5dfc2995da55e62_proc_4194299/synthetic_wg_accuracy_curves.png"], ["experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_cfffc902aaa84d0caed31d045775cadb_proc_4194301/synthetic_class_distribution.png", "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_cfffc902aaa84d0caed31d045775cadb_proc_4194301/synthetic_loss_curves.png", "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_cfffc902aaa84d0caed31d045775cadb_proc_4194301/synthetic_wg_accuracy_curves.png"], ["experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/seed_aggregation_25890277eb35452f89e51325a41a91c3/synthetic_loss_curves_mean_se.png", "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/seed_aggregation_25890277eb35452f89e51325a41a91c3/synthetic_class_distribution_mean_se.png", "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/seed_aggregation_25890277eb35452f89e51325a41a91c3/synthetic_wg_accuracy_curves_mean_se.png"]], "plot_analyses": [[], [], [], [{"analysis": "Synthetic dataset exhibits a balanced class distribution in the ground truth (approximately 255 vs 245) and model predictions closely mirror this (approximately 249 vs 251), indicating no strong bias in prediction counts across classes.", "plot_path": "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_6d7f38df3e6b47049b7e197e63eb519c_proc_4194301/synthetic_class_distribution.png"}, {"analysis": "Training and validation losses both decrease rapidly from epoch 1 to 2 (from ~0.54 to ~0.47), then gradually taper off and converge around ~0.45 by epoch 6, with no divergence between curves, suggesting stable learning without overfitting.", "plot_path": "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_6d7f38df3e6b47049b7e197e63eb519c_proc_4194301/synthetic_loss_curves.png"}, {"analysis": "Weighted group accuracy jumps from ~98.5% at epoch 1 to ~99.4% (train) and ~99.17% (validation) at epoch 2, then remains flat through epoch 6, indicating the grouping mechanism quickly identifies subgroups and yields near-perfect performance early in training.", "plot_path": "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_6d7f38df3e6b47049b7e197e63eb519c_proc_4194301/synthetic_wg_accuracy_curves.png"}], [], [], [{"analysis": "The ground truth class distribution is slightly skewed with 256 samples in one class and 244 in the other, indicating a mild class imbalance. The model\u2019s prediction distribution (about 251 vs. 249) is more balanced, suggesting that the classifier is slightly overcorrecting for the class imbalance and neutralizing the skew. This indicates that the model is not simply replicating the training data distribution but may be applying some form of implicit regularization or decision threshold adjustment to produce nearly equal class predictions.", "plot_path": "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_f2502cda9c434cd0a2df81e1d471f9a3_proc_4194300/synthetic_class_distribution.png"}, {"analysis": "Training and validation loss curves decrease rapidly from about 0.59 to around 0.50 within six epochs, with the biggest drop between the first and second epoch. The close tracking of validation loss with training loss and the plateau around 0.50 by epoch 4 imply fast convergence and little to no overfitting. This behavior confirms that the basic training pipeline is stable on the synthetic set and is capable of minimizing the loss effectively under the chosen hyperparameters.", "plot_path": "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_f2502cda9c434cd0a2df81e1d471f9a3_proc_4194300/synthetic_loss_curves.png"}, {"analysis": "Weighted group accuracy on both training and validation jumps from about 0.98 at epoch 1 to approximately 0.989 by epoch 2 and remains constant thereafter. The high level and stability of the group-weighted metric indicate that the model is uniformly accurate across all pseudo-groups (or clusters) in the synthetic dataset, suggesting that the unsupervised grouping and group-robust training mechanism are functioning correctly at this preliminary stage.", "plot_path": "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_f2502cda9c434cd0a2df81e1d471f9a3_proc_4194300/synthetic_wg_accuracy_curves.png"}], [{"analysis": "Class distribution: ground-truth classes are nearly balanced (254 vs. 246), but model predictions skew slightly toward class 0 (272 vs. 228). This indicates a mild bias in the classifier\u2019s decision boundary, causing an underprediction of class 1 despite equal representation in the data.", "plot_path": "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_763d4f6c26f84e40a5dfc2995da55e62_proc_4194299/synthetic_class_distribution.png"}, {"analysis": "Loss curves: both training and validation losses drop sharply in the first two epochs (from around 0.63 to 0.57) and then plateau near 0.55 by epoch 4. The close alignment of training and validation trajectories, with under 0.01 gap at convergence, suggests good optimization and minimal overfitting at this stage.", "plot_path": "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_763d4f6c26f84e40a5dfc2995da55e62_proc_4194299/synthetic_loss_curves.png"}, {"analysis": "Weighted group accuracy: training accuracy jumps from ~0.22 to ~0.85 between epochs 1 and 2, rising to ~0.91 by epoch 6. Validation weighted-group accuracy follows a similar pattern, improving from ~0.26 to ~0.87 by epoch 2 and reaching ~0.93 at epoch 6. Consistent gains across both splits indicate that the model is learning across different pseudo-groups effectively, with group-robust performance stabilizing after epoch 3.", "plot_path": "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_763d4f6c26f84e40a5dfc2995da55e62_proc_4194299/synthetic_wg_accuracy_curves.png"}], [{"analysis": "Ground truth class distribution is nearly balanced (about 255 vs. 245 samples), whereas predicted labels are skewed toward class 0 (around 282 vs. 218). This suggests the model tends to over-predict class 0 relative to the true data proportions, indicating a mild bias in classification decisions.", "plot_path": "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_cfffc902aaa84d0caed31d045775cadb_proc_4194301/synthetic_class_distribution.png"}, {"analysis": "Both training and validation losses decrease steadily from epoch 1 to epoch 6 (training: 0.59 \u2192 0.493; validation: 0.60 \u2192 0.498). The curves remain close throughout, showing smooth convergence and no pronounced overfitting. The rate of decrease slows by later epochs, implying diminishing returns after epoch 4 or so.", "plot_path": "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_cfffc902aaa84d0caed31d045775cadb_proc_4194301/synthetic_loss_curves.png"}, {"analysis": "Weighted group accuracy rises quickly in early epochs (from ~0.60 to ~0.86 on training and ~0.62 to ~0.855 on validation by epoch 3) and then plateaus, reaching about 0.895 (training) and 0.87 (validation) at epoch 6. The small gap between training and validation group accuracy suggests mild overfitting at the group level but overall strong worst-group performance.", "plot_path": "experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/experiment_results/experiment_cfffc902aaa84d0caed31d045775cadb_proc_4194301/synthetic_wg_accuracy_curves.png"}], []], "vlm_feedback_summary": ["[]", "[]", "[]", "Balanced class distribution maintained in predictions; loss curves show steady\nconvergence with no overfitting; weighted group accuracy converges extremely\nquickly to high values, demonstrating effective pseudo-group calibration.", "[]", "[]", "The experiment demonstrates that the basic implementation achieves balanced\npredictions despite a slight class imbalance, converges quickly without\noverfitting, and maintains uniformly high group-level accuracy across training\nand validation. This confirms functional correctness of the training pipeline\nand the integration of weighted group objectives on the synthetic dataset. Next\nsteps should involve applying UGC clustering on actual spurious-correlation\nbenchmarks, validating pseudo-group discovery, and comparing against oracle\ngroup baselines.", "Initial results show balanced ground truth but slight class prediction bias,\nrapid convergence of loss with minimal generalization gap, and strong weighted\ngroup accuracy improvements stabilizing by epoch 3, demonstrating effective\nrobust learning across clusters without overfitting.", "The model demonstrates effective robust training: losses converge steadily\nwithout overfitting and weighted group accuracy on both training and validation\nsets improves significantly, nearing 0.87\u20130.90 by the final epoch. A slight\nclass imbalance in predictions highlights room for further calibration of group-\nrobust reweighting.", "[]"], "exec_time": [0.004914999008178711, 1.0042943954467773, 0.004177570343017578, 3.7870523929595947, 1.0113649368286133, 3.1114602088928223, 3.9383199214935303, 3.915065288543701, 3.907181739807129, null], "exec_time_feedback": ["", "", "", "", "", "", "", "", "", ""], "datasets_successfully_tested": [[], [], [], ["['synthetic']"], [], [], ["['synthetic']"], ["['synthetic']"], ["['synthetic']"], []], "plot_code": [null, null, null, "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\n# Load experiment data\ntry:\n    experiment_data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    experiment_data = {}\n\ndata = experiment_data.get(\"synthetic\", {})\nlosses = data.get(\"losses\", {})\nmetrics = data.get(\"metrics\", {})\ntrain_loss = losses.get(\"train\", [])\nval_loss = losses.get(\"val\", [])\ntrain_metric = metrics.get(\"train\", [])\nval_metric = metrics.get(\"val\", [])\npreds = data.get(\"predictions\", np.array([]))\ntruths = data.get(\"ground_truth\", np.array([]))\nepochs = list(range(1, len(train_loss) + 1))\n\n# Plot loss curves\ntry:\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].plot(epochs, train_loss, marker=\"o\")\n    axes[1].plot(epochs, val_loss, marker=\"o\")\n    axes[0].set_title(\"Left: Training Loss\")\n    axes[1].set_title(\"Right: Validation Loss\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Loss\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Loss\")\n    fig.suptitle(\"Synthetic Dataset Loss Curves\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_loss_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating loss curve plot: {e}\")\n    plt.close()\n\n# Plot weighted\u2010group accuracy curves\ntry:\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].plot(epochs, train_metric, marker=\"o\")\n    axes[1].plot(epochs, val_metric, marker=\"o\")\n    axes[0].set_title(\"Left: Training Weighted Group Accuracy\")\n    axes[1].set_title(\"Right: Validation Weighted Group Accuracy\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Accuracy\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Accuracy\")\n    fig.suptitle(\"Synthetic Dataset Weighted Group Accuracy\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_wg_accuracy_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating wg accuracy plot: {e}\")\n    plt.close()\n\n# Plot class distribution of ground truth vs predictions\ntry:\n    ut, ct = np.unique(truths, return_counts=True)\n    up, cp = np.unique(preds, return_counts=True)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].bar(ut, ct)\n    axes[1].bar(up, cp)\n    axes[0].set_title(\"Left: Ground Truth Distribution\")\n    axes[1].set_title(\"Right: Prediction Distribution\")\n    axes[0].set_xlabel(\"Class\")\n    axes[0].set_ylabel(\"Count\")\n    axes[1].set_xlabel(\"Class\")\n    axes[1].set_ylabel(\"Count\")\n    fig.suptitle(\"Synthetic Dataset Class Distribution\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_class_distribution.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating class distribution plot: {e}\")\n    plt.close()\n", null, null, "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\n# Load experiment data\ntry:\n    experiment_data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    experiment_data = {}\n\ndata = experiment_data.get(\"synthetic\", {})\nlosses = data.get(\"losses\", {})\nmetrics = data.get(\"metrics\", {})\ntrain_loss = losses.get(\"train\", [])\nval_loss = losses.get(\"val\", [])\ntrain_metric = metrics.get(\"train\", [])\nval_metric = metrics.get(\"val\", [])\npreds = data.get(\"predictions\", np.array([]))\ntruths = data.get(\"ground_truth\", np.array([]))\nepochs = list(range(1, len(train_loss) + 1))\n\n# Plot loss curves\ntry:\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].plot(epochs, train_loss, marker=\"o\")\n    axes[1].plot(epochs, val_loss, marker=\"o\")\n    axes[0].set_title(\"Left: Training Loss\")\n    axes[1].set_title(\"Right: Validation Loss\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Loss\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Loss\")\n    fig.suptitle(\"Synthetic Dataset Loss Curves\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_loss_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating loss curve plot: {e}\")\n    plt.close()\n\n# Plot weighted\u2010group accuracy curves\ntry:\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].plot(epochs, train_metric, marker=\"o\")\n    axes[1].plot(epochs, val_metric, marker=\"o\")\n    axes[0].set_title(\"Left: Training Weighted Group Accuracy\")\n    axes[1].set_title(\"Right: Validation Weighted Group Accuracy\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Accuracy\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Accuracy\")\n    fig.suptitle(\"Synthetic Dataset Weighted Group Accuracy\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_wg_accuracy_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating wg accuracy plot: {e}\")\n    plt.close()\n\n# Plot class distribution of ground truth vs predictions\ntry:\n    ut, ct = np.unique(truths, return_counts=True)\n    up, cp = np.unique(preds, return_counts=True)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].bar(ut, ct)\n    axes[1].bar(up, cp)\n    axes[0].set_title(\"Left: Ground Truth Distribution\")\n    axes[1].set_title(\"Right: Prediction Distribution\")\n    axes[0].set_xlabel(\"Class\")\n    axes[0].set_ylabel(\"Count\")\n    axes[1].set_xlabel(\"Class\")\n    axes[1].set_ylabel(\"Count\")\n    fig.suptitle(\"Synthetic Dataset Class Distribution\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_class_distribution.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating class distribution plot: {e}\")\n    plt.close()\n", "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\n# Load experiment data\ntry:\n    experiment_data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    experiment_data = {}\n\ndata = experiment_data.get(\"synthetic\", {})\nlosses = data.get(\"losses\", {})\nmetrics = data.get(\"metrics\", {})\ntrain_loss = losses.get(\"train\", [])\nval_loss = losses.get(\"val\", [])\ntrain_metric = metrics.get(\"train\", [])\nval_metric = metrics.get(\"val\", [])\npreds = data.get(\"predictions\", np.array([]))\ntruths = data.get(\"ground_truth\", np.array([]))\nepochs = list(range(1, len(train_loss) + 1))\n\n# Plot loss curves\ntry:\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].plot(epochs, train_loss, marker=\"o\")\n    axes[1].plot(epochs, val_loss, marker=\"o\")\n    axes[0].set_title(\"Left: Training Loss\")\n    axes[1].set_title(\"Right: Validation Loss\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Loss\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Loss\")\n    fig.suptitle(\"Synthetic Dataset Loss Curves\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_loss_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating loss curve plot: {e}\")\n    plt.close()\n\n# Plot weighted\u2010group accuracy curves\ntry:\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].plot(epochs, train_metric, marker=\"o\")\n    axes[1].plot(epochs, val_metric, marker=\"o\")\n    axes[0].set_title(\"Left: Training Weighted Group Accuracy\")\n    axes[1].set_title(\"Right: Validation Weighted Group Accuracy\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Accuracy\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Accuracy\")\n    fig.suptitle(\"Synthetic Dataset Weighted Group Accuracy\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_wg_accuracy_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating wg accuracy plot: {e}\")\n    plt.close()\n\n# Plot class distribution of ground truth vs predictions\ntry:\n    ut, ct = np.unique(truths, return_counts=True)\n    up, cp = np.unique(preds, return_counts=True)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].bar(ut, ct)\n    axes[1].bar(up, cp)\n    axes[0].set_title(\"Left: Ground Truth Distribution\")\n    axes[1].set_title(\"Right: Prediction Distribution\")\n    axes[0].set_xlabel(\"Class\")\n    axes[0].set_ylabel(\"Count\")\n    axes[1].set_xlabel(\"Class\")\n    axes[1].set_ylabel(\"Count\")\n    fig.suptitle(\"Synthetic Dataset Class Distribution\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_class_distribution.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating class distribution plot: {e}\")\n    plt.close()\n", "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\n# Load experiment data\ntry:\n    experiment_data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    experiment_data = {}\n\ndata = experiment_data.get(\"synthetic\", {})\nlosses = data.get(\"losses\", {})\nmetrics = data.get(\"metrics\", {})\ntrain_loss = losses.get(\"train\", [])\nval_loss = losses.get(\"val\", [])\ntrain_metric = metrics.get(\"train\", [])\nval_metric = metrics.get(\"val\", [])\npreds = data.get(\"predictions\", np.array([]))\ntruths = data.get(\"ground_truth\", np.array([]))\nepochs = list(range(1, len(train_loss) + 1))\n\n# Plot loss curves\ntry:\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].plot(epochs, train_loss, marker=\"o\")\n    axes[1].plot(epochs, val_loss, marker=\"o\")\n    axes[0].set_title(\"Left: Training Loss\")\n    axes[1].set_title(\"Right: Validation Loss\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Loss\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Loss\")\n    fig.suptitle(\"Synthetic Dataset Loss Curves\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_loss_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating loss curve plot: {e}\")\n    plt.close()\n\n# Plot weighted\u2010group accuracy curves\ntry:\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].plot(epochs, train_metric, marker=\"o\")\n    axes[1].plot(epochs, val_metric, marker=\"o\")\n    axes[0].set_title(\"Left: Training Weighted Group Accuracy\")\n    axes[1].set_title(\"Right: Validation Weighted Group Accuracy\")\n    axes[0].set_xlabel(\"Epoch\")\n    axes[0].set_ylabel(\"Accuracy\")\n    axes[1].set_xlabel(\"Epoch\")\n    axes[1].set_ylabel(\"Accuracy\")\n    fig.suptitle(\"Synthetic Dataset Weighted Group Accuracy\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_wg_accuracy_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating wg accuracy plot: {e}\")\n    plt.close()\n\n# Plot class distribution of ground truth vs predictions\ntry:\n    ut, ct = np.unique(truths, return_counts=True)\n    up, cp = np.unique(preds, return_counts=True)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].bar(ut, ct)\n    axes[1].bar(up, cp)\n    axes[0].set_title(\"Left: Ground Truth Distribution\")\n    axes[1].set_title(\"Right: Prediction Distribution\")\n    axes[0].set_xlabel(\"Class\")\n    axes[0].set_ylabel(\"Count\")\n    axes[1].set_xlabel(\"Class\")\n    axes[1].set_ylabel(\"Count\")\n    fig.suptitle(\"Synthetic Dataset Class Distribution\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_class_distribution.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating class distribution plot: {e}\")\n    plt.close()\n", "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n# Experiment data paths under AI_SCIENTIST_ROOT\nexperiment_data_path_list = [\n    \"experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/\"\n    \"experiment_results/experiment_f2502cda9c434cd0a2df81e1d471f9a3_proc_4194300/experiment_data.npy\",\n    \"experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/\"\n    \"experiment_results/experiment_763d4f6c26f84e40a5dfc2995da55e62_proc_4194299/experiment_data.npy\",\n    \"experiments/2025-06-06_23-36-12_gradient_cluster_robust_attempt_0/logs/0-run/\"\n    \"experiment_results/experiment_cfffc902aaa84d0caed31d045775cadb_proc_4194301/experiment_data.npy\",\n]\n\n# Load and collect synthetic data from all experiments\nall_data = []\ntry:\n    for rel_path in experiment_data_path_list:\n        exp = np.load(\n            os.path.join(os.getenv(\"AI_SCIENTIST_ROOT\"), rel_path), allow_pickle=True\n        ).item()\n        all_data.append(exp.get(\"synthetic\", {}))\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n\n# Extract lists of curves and predictions\ntrain_losses_list = [d.get(\"losses\", {}).get(\"train\", []) for d in all_data]\nval_losses_list = [d.get(\"losses\", {}).get(\"val\", []) for d in all_data]\ntrain_metrics_list = [d.get(\"metrics\", {}).get(\"train\", []) for d in all_data]\nval_metrics_list = [d.get(\"metrics\", {}).get(\"val\", []) for d in all_data]\npreds_list = [d.get(\"predictions\", np.array([])) for d in all_data]\ntruths_list = [d.get(\"ground_truth\", np.array([])) for d in all_data]\n\n# Determine common epoch range\nmin_epochs = min([len(x) for x in train_losses_list + val_losses_list] or [0])\nepochs = np.arange(1, min_epochs + 1)\n\n# Convert and crop to arrays\ntrain_losses = np.array([lst[:min_epochs] for lst in train_losses_list])\nval_losses = np.array([lst[:min_epochs] for lst in val_losses_list])\ntrain_metrics = np.array([lst[:min_epochs] for lst in train_metrics_list])\nval_metrics = np.array([lst[:min_epochs] for lst in val_metrics_list])\n\n\n# Function to compute mean and standard error\ndef mean_sem(arr):\n    m = np.mean(arr, axis=0)\n    s = (\n        np.std(arr, axis=0, ddof=1) / np.sqrt(arr.shape[0])\n        if arr.shape[0] > 1\n        else np.zeros_like(m)\n    )\n    return m, s\n\n\ntrain_loss_mean, train_loss_sem = mean_sem(train_losses)\nval_loss_mean, val_loss_sem = mean_sem(val_losses)\ntrain_acc_mean, train_acc_sem = mean_sem(train_metrics)\nval_acc_mean, val_acc_sem = mean_sem(val_metrics)\n\n# Plot loss curves with error bars\ntry:\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].errorbar(\n        epochs,\n        train_loss_mean,\n        yerr=train_loss_sem,\n        marker=\"o\",\n        label=\"Train Loss Mean \u00b1 SE\",\n    )\n    axes[1].errorbar(\n        epochs, val_loss_mean, yerr=val_loss_sem, marker=\"o\", label=\"Val Loss Mean \u00b1 SE\"\n    )\n    axes[0].set_title(\"Left: Training Loss Mean \u00b1 SE\")\n    axes[1].set_title(\"Right: Validation Loss Mean \u00b1 SE\")\n    for ax in axes:\n        ax.set_xlabel(\"Epoch\")\n        ax.set_ylabel(\"Loss\")\n        ax.legend()\n    fig.suptitle(\"Synthetic Dataset Loss Curves (Mean \u00b1 SE)\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_loss_curves_mean_se.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating loss curve plot: {e}\")\n    plt.close()\n\n# Plot weighted-group accuracy curves\ntry:\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].errorbar(\n        epochs,\n        train_acc_mean,\n        yerr=train_acc_sem,\n        marker=\"o\",\n        label=\"Train Accuracy Mean \u00b1 SE\",\n    )\n    axes[1].errorbar(\n        epochs,\n        val_acc_mean,\n        yerr=val_acc_sem,\n        marker=\"o\",\n        label=\"Val Accuracy Mean \u00b1 SE\",\n    )\n    axes[0].set_title(\"Left: Training Weighted Group Accuracy Mean \u00b1 SE\")\n    axes[1].set_title(\"Right: Validation Weighted Group Accuracy Mean \u00b1 SE\")\n    for ax in axes:\n        ax.set_xlabel(\"Epoch\")\n        ax.set_ylabel(\"Accuracy\")\n        ax.legend()\n    fig.suptitle(\"Synthetic Dataset Weighted Group Accuracy (Mean \u00b1 SE)\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_wg_accuracy_curves_mean_se.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating wg accuracy plot: {e}\")\n    plt.close()\n\n# Plot class distribution mean and SE\ntry:\n    # Combine labels across experiments\n    all_truths = np.concatenate(truths_list) if truths_list else np.array([])\n    all_preds = np.concatenate(preds_list) if preds_list else np.array([])\n    labels = (\n        np.unique(np.concatenate([all_truths, all_preds]))\n        if all_truths.size or all_preds.size\n        else np.array([])\n    )\n    truth_counts = np.array(\n        [[np.sum(trut == lbl) for lbl in labels] for trut in truths_list]\n    )\n    pred_counts = np.array(\n        [[np.sum(pred == lbl) for lbl in labels] for pred in preds_list]\n    )\n    truth_mean, truth_sem = mean_sem(truth_counts)\n    pred_mean, pred_sem = mean_sem(pred_counts)\n    fig, axes = plt.subplots(1, 2, figsize=(10, 4))\n    axes[0].bar(labels, truth_mean, yerr=truth_sem, capsize=5)\n    axes[1].bar(labels, pred_mean, yerr=pred_sem, capsize=5)\n    axes[0].set_title(\"Left: Ground Truth Distribution Mean \u00b1 SE\")\n    axes[1].set_title(\"Right: Prediction Distribution Mean \u00b1 SE\")\n    for ax in axes:\n        ax.set_xlabel(\"Class\")\n        ax.set_ylabel(\"Count\")\n    fig.suptitle(\"Synthetic Dataset Class Distribution (Mean \u00b1 SE)\")\n    plt.tight_layout(rect=[0, 0.03, 1, 0.95])\n    plt.savefig(os.path.join(working_dir, \"synthetic_class_distribution_mean_se.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating class distribution plot: {e}\")\n    plt.close()\n"], "plot_plan": [null, null, null, "I will load the experiment data from the working directory and extract training/validation losses, weighted\u2010group accuracy metrics, and test predictions vs. ground truth for the synthetic dataset. Then I will create three separate figures\u2014each wrapped in its own try\u2010except\u2014to visualize: (1) loss curves with left subplot for training loss and right for validation loss; (2) weighted\u2010group accuracy curves similarly arranged; and (3) class distributions showing ground truth vs. prediction counts. Each figure will include a suptitle specifying the synthetic dataset and subplot titles in the style \u201cLeft: \u2026, Right: \u2026\u201d. I will label axes with epochs or class and add markers for clarity. Finally, each plot will be saved to `working_dir` with descriptive filenames, and figures will be closed after saving or on error.", null, null, null, null, null, null], "ablation_name": [null, null, null, null, null, null, null, null, null, null], "hyperparam_name": [null, null, null, null, null, null, null, null, null, null], "is_seed_node": [false, false, false, false, false, false, true, true, true, true], "is_seed_agg_node": [false, false, false, false, false, false, false, false, false, true], "parse_metrics_plan": ["", "", "", "I will load the saved NumPy experiment file, extract the final training and\nvalidation losses as well as the robust training and validation accuracies from\nthe stored lists, compute the overall test accuracy from the saved predictions\nand ground truth arrays, and then print each metric with clear labels under the\ndataset name. The script runs immediately at the global scope without any\nguarded entry point.", "", "I will load the saved experiment data from the `working` directory using the\ncurrent working directory path. Then, for each dataset in the saved dictionary,\nI will extract the final training and validation worst\u2010group accuracies as well\nas the final training and validation losses, and print them with precise metric\nnames.", "I will load the saved NumPy experiment file, extract the final training and\nvalidation losses as well as the robust training and validation accuracies from\nthe stored lists, compute the overall test accuracy from the saved predictions\nand ground truth arrays, and then print each metric with clear labels under the\ndataset name. The script runs immediately at the global scope without any\nguarded entry point.", "I will load the saved NumPy experiment file, extract the final training and\nvalidation losses as well as the robust training and validation accuracies from\nthe stored lists, compute the overall test accuracy from the saved predictions\nand ground truth arrays, and then print each metric with clear labels under the\ndataset name. The script runs immediately at the global scope without any\nguarded entry point.", "I will load the saved NumPy experiment file, extract the final training and\nvalidation losses as well as the robust training and validation accuracies from\nthe stored lists, compute the overall test accuracy from the saved predictions\nand ground truth arrays, and then print each metric with clear labels under the\ndataset name. The script runs immediately at the global scope without any\nguarded entry point.", ""], "parse_metrics_code": ["", "", "", "import os\nimport numpy as np\n\n# Locate and load the experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\ndata_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(data_path, allow_pickle=True).item()\n\n# Iterate through datasets in the experiment data\nfor dataset_name, dataset in experiment_data.items():\n    # Extract stored metrics and losses\n    train_losses = dataset[\"losses\"][\"train\"]\n    val_losses = dataset[\"losses\"][\"val\"]\n    train_metrics = dataset[\"metrics\"][\"train\"]\n    val_metrics = dataset[\"metrics\"][\"val\"]\n\n    # Get final values\n    final_train_loss = train_losses[-1]\n    final_val_loss = val_losses[-1]\n    final_train_acc = train_metrics[-1]\n    final_val_acc = val_metrics[-1]\n\n    # Compute test accuracy if predictions are available\n    test_acc = None\n    if \"predictions\" in dataset and \"ground_truth\" in dataset:\n        preds = dataset[\"predictions\"]\n        truths = dataset[\"ground_truth\"]\n        test_acc = (preds == truths).mean()\n\n    # Print results\n    print(f\"Dataset: {dataset_name}\")\n    print(f\"train loss: {final_train_loss:.4f}\")\n    print(f\"train accuracy: {final_train_acc:.4f}\")\n    print(f\"validation loss: {final_val_loss:.4f}\")\n    print(f\"validation accuracy: {final_val_acc:.4f}\")\n    if test_acc is not None:\n        print(f\"test accuracy: {test_acc:.4f}\")\n", "", "import os\nimport numpy as np\n\n# Locate and load the experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\nfile_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(file_path, allow_pickle=True).item()\n\n# Iterate through each dataset and print final metrics\nfor dataset_name, results in experiment_data.items():\n    print(f\"Dataset: {dataset_name}\")\n\n    # Extract metric and loss histories\n    train_accs = results[\"metrics\"][\"train\"]\n    val_accs = results[\"metrics\"][\"val\"]\n    train_losses = results[\"losses\"][\"train\"]\n    val_losses = results[\"losses\"][\"val\"]\n\n    # Get final values\n    final_train_acc = train_accs[-1]\n    final_val_acc = val_accs[-1]\n    final_train_loss = train_losses[-1]\n    final_val_loss = val_losses[-1]\n\n    # Print the final metrics with clear labels\n    print(f\"Final train worst-group accuracy: {final_train_acc:.4f}\")\n    print(f\"Final validation worst-group accuracy: {final_val_acc:.4f}\")\n    print(f\"Final train loss: {final_train_loss:.4f}\")\n    print(f\"Final validation loss: {final_val_loss:.4f}\")\n", "import os\nimport numpy as np\n\n# Locate and load the experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\ndata_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(data_path, allow_pickle=True).item()\n\n# Iterate through datasets in the experiment data\nfor dataset_name, dataset in experiment_data.items():\n    # Extract stored metrics and losses\n    train_losses = dataset[\"losses\"][\"train\"]\n    val_losses = dataset[\"losses\"][\"val\"]\n    train_metrics = dataset[\"metrics\"][\"train\"]\n    val_metrics = dataset[\"metrics\"][\"val\"]\n\n    # Get final values\n    final_train_loss = train_losses[-1]\n    final_val_loss = val_losses[-1]\n    final_train_acc = train_metrics[-1]\n    final_val_acc = val_metrics[-1]\n\n    # Compute test accuracy if predictions are available\n    test_acc = None\n    if \"predictions\" in dataset and \"ground_truth\" in dataset:\n        preds = dataset[\"predictions\"]\n        truths = dataset[\"ground_truth\"]\n        test_acc = (preds == truths).mean()\n\n    # Print results\n    print(f\"Dataset: {dataset_name}\")\n    print(f\"train loss: {final_train_loss:.4f}\")\n    print(f\"train accuracy: {final_train_acc:.4f}\")\n    print(f\"validation loss: {final_val_loss:.4f}\")\n    print(f\"validation accuracy: {final_val_acc:.4f}\")\n    if test_acc is not None:\n        print(f\"test accuracy: {test_acc:.4f}\")\n", "import os\nimport numpy as np\n\n# Locate and load the experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\ndata_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(data_path, allow_pickle=True).item()\n\n# Iterate through datasets in the experiment data\nfor dataset_name, dataset in experiment_data.items():\n    # Extract stored metrics and losses\n    train_losses = dataset[\"losses\"][\"train\"]\n    val_losses = dataset[\"losses\"][\"val\"]\n    train_metrics = dataset[\"metrics\"][\"train\"]\n    val_metrics = dataset[\"metrics\"][\"val\"]\n\n    # Get final values\n    final_train_loss = train_losses[-1]\n    final_val_loss = val_losses[-1]\n    final_train_acc = train_metrics[-1]\n    final_val_acc = val_metrics[-1]\n\n    # Compute test accuracy if predictions are available\n    test_acc = None\n    if \"predictions\" in dataset and \"ground_truth\" in dataset:\n        preds = dataset[\"predictions\"]\n        truths = dataset[\"ground_truth\"]\n        test_acc = (preds == truths).mean()\n\n    # Print results\n    print(f\"Dataset: {dataset_name}\")\n    print(f\"train loss: {final_train_loss:.4f}\")\n    print(f\"train accuracy: {final_train_acc:.4f}\")\n    print(f\"validation loss: {final_val_loss:.4f}\")\n    print(f\"validation accuracy: {final_val_acc:.4f}\")\n    if test_acc is not None:\n        print(f\"test accuracy: {test_acc:.4f}\")\n", "import os\nimport numpy as np\n\n# Locate and load the experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\ndata_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(data_path, allow_pickle=True).item()\n\n# Iterate through datasets in the experiment data\nfor dataset_name, dataset in experiment_data.items():\n    # Extract stored metrics and losses\n    train_losses = dataset[\"losses\"][\"train\"]\n    val_losses = dataset[\"losses\"][\"val\"]\n    train_metrics = dataset[\"metrics\"][\"train\"]\n    val_metrics = dataset[\"metrics\"][\"val\"]\n\n    # Get final values\n    final_train_loss = train_losses[-1]\n    final_val_loss = val_losses[-1]\n    final_train_acc = train_metrics[-1]\n    final_val_acc = val_metrics[-1]\n\n    # Compute test accuracy if predictions are available\n    test_acc = None\n    if \"predictions\" in dataset and \"ground_truth\" in dataset:\n        preds = dataset[\"predictions\"]\n        truths = dataset[\"ground_truth\"]\n        test_acc = (preds == truths).mean()\n\n    # Print results\n    print(f\"Dataset: {dataset_name}\")\n    print(f\"train loss: {final_train_loss:.4f}\")\n    print(f\"train accuracy: {final_train_acc:.4f}\")\n    print(f\"validation loss: {final_val_loss:.4f}\")\n    print(f\"validation accuracy: {final_val_acc:.4f}\")\n    if test_acc is not None:\n        print(f\"test accuracy: {test_acc:.4f}\")\n", ""], "parse_term_out": ["", "", "", "['Dataset: synthetic', '\\n', 'train loss: 0.4523', '\\n', 'train accuracy:\n0.9942', '\\n', 'validation loss: 0.4495', '\\n', 'validation accuracy: 0.9916',\n'\\n', 'test accuracy: 0.9860', '\\n', 'Execution time: a moment seconds (time\nlimit is an hour).']", "", "['Dataset: synthetic', '\\n', 'Final train worst-group accuracy: 0.0000', '\\n',\n'Final validation worst-group accuracy: 0.0000', '\\n', 'Final train loss:\n0.0004', '\\n', 'Final validation loss: 1.1024', '\\n', 'Execution time: a moment\nseconds (time limit is an hour).']", "['Dataset: synthetic', '\\n', 'train loss: 0.5028', '\\n', 'train accuracy:\n0.9884', '\\n', 'validation loss: 0.5044', '\\n', 'validation accuracy: 0.9885',\n'\\n', 'test accuracy: 0.9880', '\\n', 'Execution time: a moment seconds (time\nlimit is an hour).']", "['Dataset: synthetic', '\\n', 'train loss: 0.5523', '\\n', 'train accuracy:\n0.9130', '\\n', 'validation loss: 0.5563', '\\n', 'validation accuracy: 0.9275',\n'\\n', 'test accuracy: 0.9640', '\\n', 'Execution time: a moment seconds (time\nlimit is an hour).']", "['Dataset: synthetic', '\\n', 'train loss: 0.4936', '\\n', 'train accuracy:\n0.8923', '\\n', 'validation loss: 0.4986', '\\n', 'validation accuracy: 0.8702',\n'\\n', 'test accuracy: 0.9440', '\\n', 'Execution time: a moment seconds (time\nlimit is an hour).']", ""], "parse_exc_type": [null, null, null, null, null, null, null, null, null, null], "parse_exc_info": [null, null, null, null, null, null, null, null, null, null], "parse_exc_stack": [null, null, null, null, null, null, null, null, null, null], "completed_stages": ["Stage_1"]};
+
+// Add log directory path and stage info to the tree data
+treeStructData.log_dir_path = window.location.pathname.split('/').slice(0, -1).join('/');
+treeStructData.current_stage = window.location.pathname.includes('stage_')
+  ? window.location.pathname.split('stage_')[1].split('/')[0]
+  : 'Stage_1';
+
+// Initialize background color
+window.bgColCurrent = bgCol;
+
+// Function to set background color that can be called from the console
+function setBackgroundColor(color) {
+  // Update the global color
+  updateBackgroundColor(color);
+
+  // Refresh the current sketch to apply the new background color
+  if (currentStage) {
+    startSketch(currentStage);
+  }
+}
+
+// Load all stage data and initialize the visualization
+loadAllStageData(treeStructData);
+
+    </script>
+    <title>AI Scientist-v2 Visualization</title>
+    <style>
+      body,
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background-color: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+      #canvas-container {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 40vw;
+        height: 100vh;
+        background-color: inherit;
+        padding-top: 40px;
+      }
+      canvas {
+        float: left;
+        height: 100vh;
+        width: 100vw;
+      }
+      #text-container {
+        float: right;
+        height: 100vh;
+        width: 50vw;
+        background-color: #282c34;
+        overflow: auto;
+      }
+      #plan {
+        /* border-left: 2px solid #282c34; */
+        background-color: #282c34;
+        color: #f2f0e7;
+        min-height: 5rem;
+        padding: 1em 0 1em 1em;
+      }
+      #plot_plan {
+        background-color: #282c34;
+        color: #f2f0e7;
+        min-height: 5rem;
+        padding: 1em 0 1em 1em;
+        white-space: pre-wrap;
+      }
+      #exec_time_feedback {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #282c34;
+        border-left: 3px solid #ff5555;
+        color: #f2f0e7;
+      }
+      #exec_time {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #282c34;
+        border-left: 3px solid #ff5555;
+        color: #f2f0e7;
+      }
+      #exc_info {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #2c1f1f;
+        border-left: 3px solid #ff5555;
+        color: #f2f0e7;
+      }
+      #metrics {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #282c34;
+        color: #f2f0e7;
+      }
+      #vlm_feedback {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #1f2c2f;
+        color: #f2f0e7;
+        border-left: 3px solid #55ff55;
+      }
+      #vlm_feedback p {
+        margin: 0.5em 0;
+        white-space: pre-wrap;
+      }
+      .datasets_successfully_tested {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #282c34;
+        color: #f2f0e7;
+        border-left: 3px solid #55ff55;
+      }
+      .plots-container {
+        float: right;
+        width: 50vw;
+        padding: 1rem;
+        background-color: #282c34;
+        margin-top: 1rem;
+      }
+
+      .plot-item {
+        flex: 1 1 300px;
+        max-width: 100%;
+        margin-bottom: 1rem;
+        white-space: pre-wrap;
+      }
+
+      .plot-item img {
+        width: 100%;
+        height: auto;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: block;
+      }
+
+      .metric-group {
+        margin-bottom: 20px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .metric-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      .metric-table th,
+      .metric-table td {
+        padding: 8px;
+        text-align: left;
+        border: 1px solid #ddd;
+      }
+
+      .metric-table th {
+        background-color: #363b44;
+      }
+
+      /* Styles for tabs */
+      .tabs-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 49vw;
+        background-color: #000000;
+        z-index: 10;
+        display: flex;
+        padding: 0;
+      }
+
+      .tab {
+        cursor: pointer;
+        padding: 10px 15px;
+        background-color: #333;
+        color: #f2f0e7;
+        border: none;
+        outline: none;
+        transition: background-color 0.3s;
+        flex: 1;
+        text-align: center;
+      }
+
+      .tab:hover {
+        background-color: #444;
+      }
+
+      .tab.active {
+        background-color: #4c76af;
+        font-weight: bold;
+      }
+
+      .tab.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background-color: #282c34;
+      }
+
+      .tab-content {
+        display: none;
+        padding-top: 40px; /* Space for tabs */
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      .stage-info {
+        padding: 10px;
+        background-color: #282c34;
+        color: #f2f0e7;
+        margin-bottom: 10px;
+        font-size: 0.9em;
+      }
+
+      .stage-status {
+        display: inline-block;
+        padding: 3px 6px;
+        border-radius: 3px;
+        margin-left: 8px;
+        font-size: 0.8em;
+      }
+
+      .stage-status.completed {
+        background-color: #4caf50;
+      }
+
+      .stage-status.in-progress {
+        background-color: #2196f3;
+      }
+
+      .stage-status.not-started {
+        background-color: #9e9e9e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="tabs-container" id="stage-tabs">
+      <button class="tab" data-stage="Stage_1" onclick="selectStage('Stage_1')">Stage 1</button>
+      <button class="tab" data-stage="Stage_2" onclick="selectStage('Stage_2')">Stage 2</button>
+      <button class="tab" data-stage="Stage_3" onclick="selectStage('Stage_3')">Stage 3</button>
+      <button class="tab" data-stage="Stage_4" onclick="selectStage('Stage_4')">Stage 4</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <pre id="text-container">
+        <div id="stage-info" class="stage-info"></div>
+        <div id="plan"></div>
+        <hr>
+        <div id="exc_info"></div>
+        <hr>
+        <div id="exec_time"></div>
+        <hr>
+        <div id="exec_time_feedback"></div>
+        <hr>
+        <div id="metrics"></div>
+        <hr>
+        <div id="plot_plan"></div>
+        <hr>
+        <div class="plots-container" id="plots"></div>
+        <hr>
+        <div id="vlm_feedback"></div>
+        <hr>
+        <div id="datasets_successfully_tested"></div>
+        <hr>
+        <code id="code" class="language-python"></code>
+        <hr>
+        <code id="plot_code" class="language-python"></code>
+    </pre>
+  </body>
+</html>

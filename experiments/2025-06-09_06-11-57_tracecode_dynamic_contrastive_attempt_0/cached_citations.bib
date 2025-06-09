@@ -1,0 +1,158 @@
+
+% Feng et al. (2020) introduce CodeBERT, a bimodal pre-trained Transformer for programming and natural languages, which we use as the backbone encoder in our TraceCode contrastive framework.
+@article{feng2020codebertap,
+ author = {Zhangyin Feng and Daya Guo and Duyu Tang and Nan Duan and Xiaocheng Feng and Ming Gong and Linjun Shou and Bing Qin and Ting Liu and Daxin Jiang and Ming Zhou},
+ booktitle = {Findings},
+ journal = {ArXiv},
+ title = {CodeBERT: A Pre-Trained Model for Programming and Natural Languages},
+ volume = {abs/2002.08155},
+ year = {2020}
+}
+
+% Cite Sajnani et al. (2015) “SourcererCC: Scaling Code Clone Detection to Big-Code,” which introduces and evaluates on BigCloneBench, the large-scale code clone benchmark we use for adversarial clone detection.
+@book{sajnani2015sourcererccsc,
+ author = {Hitesh Sajnani and V. Saini and Jeffrey Svajlenko and C. Roy and C. Lopes},
+ booktitle = {International Conference on Software Engineering},
+ journal = {2016 IEEE/ACM 38th International Conference on Software Engineering (ICSE)},
+ pages = {1157-1168},
+ title = {SourcererCC: Scaling Code Clone Detection to Big-Code},
+ year = {2015}
+}
+
+% Husain et al. (2019) introduce the CodeSearchNet Challenge and corpus, describing the collection of ~6M functions across six languages (including Python) and the expert annotations and generated docstrings. We cite this work in the Dataset Preparation section when detailing our use of Python functions from CodeSearchNet.
+@article{husain2019codesearchnetce,
+ author = {Hamel Husain and Hongqiu Wu and Tiferet Gazit and Miltiadis Allamanis and Marc Brockschmidt},
+ booktitle = {arXiv.org},
+ journal = {ArXiv},
+ title = {CodeSearchNet Challenge: Evaluating the State of Semantic Code Search},
+ volume = {abs/1909.09436},
+ year = {2019}
+}
+
+% Jain et al. (2020) introduce ContraCode: a contrastive pre-training task for code representation learning that identifies functionally equivalent program variants among distractors. This work serves as our static-only contrastive baseline and is cited in the Related Work section.
+@article{jain2020contrastivecr,
+ author = {Paras Jain and Ajay Jain and Tianjun Zhang and P. Abbeel and Joseph E. Gonzalez and Ion Stoica},
+ booktitle = {Conference on Empirical Methods in Natural Language Processing},
+ pages = {5954-5971},
+ title = {Contrastive Code Representation Learning},
+ year = {2020}
+}
+
+% Li et al. (2018) introduce SySeVR, a deep learning framework for C/C++ vulnerability detection that learns syntax- and semantics-based program representations. We cite this work in the Related Work section when discussing prior uses of program semantics (including dynamic-inspired features) for vulnerability detection.
+@article{li2018sysevraf,
+ author = {Z. Li and Deqing Zou and Shouhuai Xu and Hai Jin and Yawei Zhu and Zhaoxuan Chen and Sujuan Wang and Jialai Wang},
+ booktitle = {IEEE Transactions on Dependable and Secure Computing},
+ journal = {IEEE Transactions on Dependable and Secure Computing},
+ pages = {2244-2258},
+ title = {SySeVR: A Framework for Using Deep Learning to Detect Software Vulnerabilities},
+ volume = {19},
+ year = {2018}
+}
+
+% D. MacIver and Z. Hatfield-Dodds (2019) introduce Hypothesis, a property-based testing library for Python, which we use to synthesize random input sets for collecting dynamic execution traces.
+@article{maciver2019hypothesisan,
+ author = {D. MacIver and Zac Hatfield-Dodds},
+ booktitle = {Journal of Open Source Software},
+ journal = {J. Open Source Softw.},
+ pages = {1891},
+ title = {Hypothesis: A new approach to property-based testing},
+ volume = {4},
+ year = {2019}
+}
+
+% Aäron van den Oord et al. (2018) introduce Contrastive Predictive Coding and the InfoNCE loss for self-supervised representation learning. We cite this work in the Methodology section when describing our contrastive pre-training objective (InfoNCE).
+@article{oord2018representationlw,
+ author = {Aäron van den Oord and Yazhe Li and O. Vinyals},
+ booktitle = {arXiv.org},
+ journal = {ArXiv},
+ title = {Representation Learning with Contrastive Predictive Coding},
+ volume = {abs/1807.03748},
+ year = {2018}
+}
+
+% Vaswani et al. (2017) introduce the Transformer architecture based solely on self-attention, dispensing with recurrence and convolutions entirely. We cite this work in the Model & Training section when describing our use of a Transformer encoder for code representation.
+@article{vaswani2017attentionia,
+ author = {Ashish Vaswani and Noam M. Shazeer and Niki Parmar and Jakob Uszkoreit and Llion Jones and Aidan N. Gomez and Lukasz Kaiser and Illia Polosukhin},
+ booktitle = {Neural Information Processing Systems},
+ pages = {5998-6008},
+ title = {Attention is All you Need},
+ year = {2017}
+}
+
+% Lu et al. (2021) introduce CodeXGLUE, a comprehensive benchmark platform for code understanding and generation tasks, including code summarization. We cite this work in the Downstream Tasks section when describing our evaluation on the CodeXGLUE summarization benchmark.
+@article{lu2021codexglueam,
+ author = {Shuai Lu and Daya Guo and Shuo Ren and Junjie Huang and Alexey Svyatkovskiy and Ambrosio Blanco and Colin B. Clement and Dawn Drain and Daxin Jiang and Duyu Tang and Ge Li and Lidong Zhou and Linjun Shou and Long Zhou and Michele Tufano and Ming Gong and Ming Zhou and Nan Duan and Neel Sundaresan and Shao Kun Deng and Shengyu Fu and Shujie Liu},
+ booktitle = {NeurIPS Datasets and Benchmarks},
+ journal = {ArXiv},
+ title = {CodeXGLUE: A Machine Learning Benchmark Dataset for Code Understanding and Generation},
+ volume = {abs/2102.04664},
+ year = {2021}
+}
+
+% ContraBERT: Enhancing Code Pre-trained Models via Contrastive Learning (ICSE 2023). This work continues training existing code pre-trained models with masked language modeling and a contrastive pre-training task using augmented code variants to improve robustness. We cite it in the Related Work section as another static‐only contrastive baseline, complementing ContraCode.
+@article{liu2023contrabertec,
+ author = {Shangqing Liu and Bozhi Wu and Xiaofei Xie and Guozhu Meng and Yang Liu},
+ booktitle = {International Conference on Software Engineering},
+ journal = {2023 IEEE/ACM 45th International Conference on Software Engineering (ICSE)},
+ pages = {2476-2487},
+ title = {ContraBERT: Enhancing Code Pre-trained Models via Contrastive Learning},
+ year = {2023}
+}
+
+% Huang et al. (2024) propose FuzzPretrain, a self‐supervised pre‐training method that embeds dynamic program execution information (via custom fuzz‐generated test cases) into code representations. Cite this in the Related Work section on dynamic‐augmented code pre‐training to contextualize TraceCode’s use of runtime traces.
+@article{huang2024coderp,
+ author = {Jiabo Huang and Jianyu Zhao and Yuyang Rong and Yiwen Guo and Yifeng He and Hao Chen},
+ booktitle = {Conference on Empirical Methods in Natural Language Processing},
+ pages = {267-278},
+ title = {Code Representation Pre-training with Complements from Program Executions},
+ year = {2024}
+}
+
+% Deqing Zou et al. (2021) introduce VulDeePecker: a Deep Learning–Based System for Multiclass Vulnerability Detection, along with its dataset of labeled code functions. Cite this paper in the Downstream Tasks section when describing our evaluation on vulnerability classification using the VulDeePecker dataset.
+@article{zou2021inlineformulatexmathnx,
+ author = {Deqing Zou and Sujuan Wang and Shouhuai Xu and Zhen Li and Hai Jin},
+ booktitle = {IEEE Transactions on Dependable and Secure Computing},
+ journal = {IEEE Transactions on Dependable and Secure Computing},
+ pages = {2224-2236},
+ title = {<inline-formula><tex-math notation="LaTeX">$\mu$</tex-math><alternatives><mml:math><mml:mi>μ</mml:mi></mml:math><inline-graphic xlink:href="zou-ieq1-2942930.gif"/></alternatives></inline-formula>VulDeePecker: A Deep Learning-Based System for Multiclass Vulnerability Detection},
+ volume = {18},
+ year = {2021}
+}
+
+% Cite GraphCodeBERT in the Related Work section when discussing static, compiler-based semantic transforms for code pre-training. GraphCodeBERT incorporates data-flow information (semantic-level structure) into a Transformer model via graph-guided attention and structure-aware pre-training tasks, providing a strong static contrast to our dynamic-trace approach.
+@article{guo2020graphcodebertpc,
+ author = {Daya Guo and Shuo Ren and Shuai Lu and Zhangyin Feng and Duyu Tang and Shujie Liu and Long Zhou and Nan Duan and Jian Yin and Daxin Jiang and M. Zhou},
+ booktitle = {International Conference on Learning Representations},
+ journal = {ArXiv},
+ title = {GraphCodeBERT: Pre-training Code Representations with Data Flow},
+ volume = {abs/2009.08366},
+ year = {2020}
+}
+
+% Ding et al. (2023) introduce CONCORD, a clone-aware contrastive learning strategy for source code that brings benign clones closer and moves deviants apart. We cite this work in the Related Work section alongside ContraCode and ContraBERT to cover static, AST-level contrastive pre-training baselines.
+@article{ding2023concordcc,
+ author = {Yangruibo Ding and Saikat Chakraborty and Luca Buratti and Saurabh Pujar and Alessandro Morari and Gail E. Kaiser and Baishakhi Ray},
+ booktitle = {International Symposium on Software Testing and Analysis},
+ journal = {Proceedings of the 32nd ACM SIGSOFT International Symposium on Software Testing and Analysis},
+ title = {CONCORD: Clone-Aware Contrastive Learning for Source Code},
+ year = {2023}
+}
+
+% Kingma and Ba (2014) introduce Adam, an adaptive stochastic optimization algorithm widely used for training deep neural networks. We cite this work in the Model & Training section when describing our optimizer choice.
+@article{kingma2014adamam,
+ author = {Diederik P. Kingma and Jimmy Ba},
+ booktitle = {International Conference on Learning Representations},
+ journal = {CoRR},
+ title = {Adam: A Method for Stochastic Optimization},
+ volume = {abs/1412.6980},
+ year = {2014}
+}
+
+% Cite CODE-MVP: a multi-view contrastive pre-training framework for code representations (plain text, AST, graphs) that learns complementary information across static views, to be referenced in the Related Work section alongside other static contrastive baselines.
+@article{wang2022codemvplt,
+ author = {Xin Wang and Yasheng Wang and Yao Wan and Jiawei Wang and Pingyi Zhou and Li Li and Hao Wu and Jin Liu},
+ booktitle = {NAACL-HLT},
+ pages = {1066-1077},
+ title = {CODE-MVP: Learning to Represent Source Code from Multiple Views with Contrastive Pre-Training},
+ year = {2022}
+}

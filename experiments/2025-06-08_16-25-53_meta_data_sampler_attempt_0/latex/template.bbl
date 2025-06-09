@@ -1,0 +1,31 @@
+\begin{thebibliography}{4}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Ghorbani \& Zou(2019)Ghorbani and Zou]{ghorbani2019datase}
+Amirata Ghorbani and James~Y. Zou.
+\newblock Data shapley: Equitable valuation of data for machine learning.
+\newblock \emph{ArXiv}, abs/1904.02868, 2019.
+
+\bibitem[Killamsetty et~al.(2020)Killamsetty, Sivasubramanian, Ramakrishnan,
+  and Iyer]{killamsetty2020glistergb}
+Krishnateja Killamsetty, D.~Sivasubramanian, Ganesh Ramakrishnan, and Rishabh
+  Iyer.
+\newblock Glister: Generalization based data subset selection for efficient and
+  robust learning.
+\newblock pp.\  8110--8118, 2020.
+
+\bibitem[Koh \& Liang(2017)Koh and Liang]{koh2017understandingbp}
+Pang~Wei Koh and Percy Liang.
+\newblock Understanding black-box predictions via influence functions.
+\newblock pp.\  1885--1894, 2017.
+
+\bibitem[Ren et~al.(2018)Ren, Zeng, Yang, and Urtasun]{ren2018learningtr}
+Mengye Ren, Wenyuan Zeng, Binh Yang, and R.~Urtasun.
+\newblock Learning to reweight examples for robust deep learning.
+\newblock pp.\  4331--4340, 2018.
+
+\end{thebibliography}

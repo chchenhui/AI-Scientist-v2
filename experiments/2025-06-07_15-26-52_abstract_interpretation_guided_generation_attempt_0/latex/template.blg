@@ -1,0 +1,53 @@
+This is BibTeX, Version 0.99d (TeX Live 2022/dev/Debian)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: template.aux
+The style file: iclr2025.bst
+Database file #1: references.bib
+Warning--I didn't find a database entry for "nguyen2013semifixpr"
+Warning--empty booktitle in bjrner2008satisfiabilitymb
+Warning--empty year in none
+Warning--empty journal in rosa2022zeroshotrc
+Warning--empty booktitle in iyer2019learningtm
+Warning--empty booktitle in lehtosalo2011languagewa
+You've used 10 entries,
+            2773 wiz_defined-function locations,
+            640 strings with 7386 characters,
+and the built_in function-call counts, 7333 in all, are:
+= -- 531
+> -- 847
+< -- 5
++ -- 283
+- -- 273
+* -- 696
+:= -- 1229
+add.period$ -- 29
+call.type$ -- 10
+change.case$ -- 121
+chr.to.int$ -- 10
+cite$ -- 25
+duplicate$ -- 201
+empty$ -- 339
+format.name$ -- 291
+if$ -- 1427
+int.to.chr$ -- 1
+int.to.str$ -- 1
+missing$ -- 9
+newline$ -- 57
+num.names$ -- 40
+pop$ -- 251
+preamble$ -- 1
+purify$ -- 111
+quote$ -- 0
+skip$ -- 225
+stack$ -- 0
+substring$ -- 39
+swap$ -- 9
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 110
+warning$ -- 5
+while$ -- 32
+width$ -- 0
+write$ -- 125
+(There were 6 warnings)

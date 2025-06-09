@@ -1,0 +1,194 @@
+
+% Gal and Ghahramani (2015) introduce Monte Carlo Dropout as a Bayesian approximation for model uncertainty in deep neural networks. We use their method to estimate per-token uncertainty via multiple stochastic forward passes (MC-dropout) in our Clarify-to-Retrieve framework.
+@article{gal2015dropoutaa,
+ author = {Y. Gal and Zoubin Ghahramani},
+ booktitle = {International Conference on Machine Learning},
+ pages = {1050-1059},
+ title = {Dropout as a Bayesian Approximation: Representing Model Uncertainty in Deep Learning},
+ year = {2015}
+}
+
+% Lewis et al. (2020) introduce Retrieval-Augmented Generation (RAG), a framework combining a pretrained seq2seq model with a dense vector retriever over Wikipedia. This work establishes the core RAG baseline for knowledge-intensive tasks and is cited in our introduction and when comparing static RAG to our interactive Clarify-to-Retrieve approach.
+@article{lewis2020retrievalaugmentedgf,
+ author = {Patrick Lewis and Ethan Perez and Aleksandara Piktus and F. Petroni and Vladimir Karpukhin and Naman Goyal and Heinrich Kuttler and M. Lewis and Wen-tau Yih and Tim Rocktäschel and Sebastian Riedel and Douwe Kiela},
+ booktitle = {Neural Information Processing Systems},
+ journal = {ArXiv},
+ title = {Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks},
+ volume = {abs/2005.11401},
+ year = {2020}
+}
+
+% Zubkova et al. (2025) introduce SUGAR (Semantic Uncertainty Guided Adaptive Retrieval), a retrieval-augmentation method that uses context-based entropy to decide when and how to retrieve, serving as a key uncertainty-driven baseline in our comparison. Cite this in the introduction when discussing uncertainty-gated retrieval methods and in the experiments section as our static uncertainty-driven retrieval baseline.
+@article{zubkova2025sugarlc,
+ author = {Hanna Zubkova and Ji-Hoon Park and Seong-Whan Lee},
+ booktitle = {IEEE International Conference on Acoustics, Speech, and Signal Processing},
+ journal = {ArXiv},
+ title = {SUGAR: Leveraging Contextual Confidence for Smarter Retrieval},
+ volume = {abs/2501.04899},
+ year = {2025}
+}
+
+% Min et al. (2020) introduce AmbigQA: a benchmark of 14,042 ambiguous open-domain questions paired with disambiguated rewrites and answers (AMBIGQA dataset), which we use in Experiment 1 to sample or construct ambiguous QA pairs. Lee et al. (2023) propose a clarification-question pipeline on the CAMBIGNQ dataset for open-domain QA, closely related to our interactive Clarify-to-Retrieve framework; cite this in Related Work when contrasting prior interactive clarification methods with our uncertainty-driven, lightweight approach.
+@article{min2020ambigqaaa,
+ author = {Sewon Min and Julian Michael and Hannaneh Hajishirzi and Luke Zettlemoyer},
+ booktitle = {Conference on Empirical Methods in Natural Language Processing},
+ pages = {5783-5797},
+ title = {AmbigQA: Answering Ambiguous Open-domain Questions},
+ year = {2020}
+}
+
+@article{lee2023askingcq,
+ author = {Dongryeol Lee and Segwang Kim and Minwoo Lee and Hwanhee Lee and Joonsuk Park and Sang-Woo Lee and Kyomin Jung},
+ booktitle = {Conference on Empirical Methods in Natural Language Processing},
+ journal = {ArXiv},
+ title = {Asking Clarification Questions to Handle Ambiguity in Open-Domain QA},
+ volume = {abs/2305.13808},
+ year = {2023}
+}
+
+% T. Kwiatkowski et al. (2019) introduce the Natural Questions dataset, a large-scale benchmark of real anonymized Google queries with short and long answer annotations. We use it in Experiments 1 (ambiguity diagnostics) and 5 (open-domain QA generalization) to evaluate answer accuracy (exact match, F1) under our Clarify-to-Retrieve framework.
+@article{kwiatkowski2019naturalqa,
+ author = {T. Kwiatkowski and J. Palomaki and Olivia Redfield and Michael Collins and Ankur P. Parikh and Chris Alberti and D. Epstein and Illia Polosukhin and Jacob Devlin and Kenton Lee and Kristina Toutanova and Llion Jones and Matthew Kelcey and Ming-Wei Chang and Andrew M. Dai and Jakob Uszkoreit and Quoc V. Le and Slav Petrov},
+ booktitle = {Transactions of the Association for Computational Linguistics},
+ journal = {Transactions of the Association for Computational Linguistics},
+ pages = {453-466},
+ title = {Natural Questions: A Benchmark for Question Answering Research},
+ volume = {7},
+ year = {2019}
+}
+
+% Joshi et al. (2017) introduce TriviaQA, a large-scale distantly supervised reading comprehension dataset containing over 650K question-answer-evidence triples. We cite this dataset in Experiment 5 when evaluating the generalization of Clarify-to-Retrieve on open-domain QA benchmarks (F1, exact match).
+@article{joshi2017triviaqaal,
+ author = {Mandar Joshi and Eunsol Choi and Daniel S. Weld and Luke Zettlemoyer},
+ booktitle = {Annual Meeting of the Association for Computational Linguistics},
+ journal = {ArXiv},
+ title = {TriviaQA: A Large Scale Distantly Supervised Challenge Dataset for Reading Comprehension},
+ volume = {abs/1705.03551},
+ year = {2017}
+}
+
+% Karpukhin et al. (2020) introduce Dense Passage Retrieval (DPR), a dual-encoder dense vector retrieval method that learns question and passage embeddings to outperform sparse retrievers (BM25) by 9–19% top-20 accuracy. We cite this when describing our retrieval setup and reporting retrieval precision@k in Experiments 2 and 5.
+@article{karpukhin2020densepr,
+ author = {Vladimir Karpukhin and Barlas Oğuz and Sewon Min and Patrick Lewis and Ledell Yu Wu and Sergey Edunov and Danqi Chen and Wen-tau Yih},
+ booktitle = {Conference on Empirical Methods in Natural Language Processing},
+ journal = {ArXiv},
+ title = {Dense Passage Retrieval for Open-Domain Question Answering},
+ volume = {abs/2004.04906},
+ year = {2020}
+}
+
+% Add Wang et al. (2023) 'Self-Knowledge Guided Retrieval Augmentation for Large Language Models'. This work introduces SKR, which uses an LLM’s self-assessed confidence to decide when to invoke external retrieval and how to weight retrieved evidence. Cite in the Related Work section alongside RAG and SUGAR as a prior static uncertainty-driven retrieval method that our interactive clarification phase extends.
+@article{wang2023selfknowledgegr,
+ author = {Yile Wang and Peng Li and Maosong Sun and Yang Liu},
+ booktitle = {Conference on Empirical Methods in Natural Language Processing},
+ pages = {10303-10315},
+ title = {Self-Knowledge Guided Retrieval Augmentation for Large Language Models},
+ year = {2023}
+}
+
+% Jonathan Berant et al. (2013) introduce the WebQuestions dataset of real user queries answered over Freebase. Cite this in Experiment 5 when evaluating generalization on open-domain QA benchmarks.
+@article{berant2013semanticpo,
+ author = {Jonathan Berant and A. Chou and Roy Frostig and Percy Liang},
+ booktitle = {Conference on Empirical Methods in Natural Language Processing},
+ pages = {1533-1544},
+ title = {Semantic Parsing on Freebase from Question-Answer Pairs},
+ year = {2013}
+}
+
+% Brown et al. (2020) introduce GPT-3, a 175B-parameter autoregressive language model demonstrating strong few-shot performance across diverse NLP tasks. We cite this paper in the methodology section to ground our use of GPT-3.5 for per-token uncertainty estimation and follow-up clarification question generation in the Clarify-to-Retrieve framework.
+@article{brown2020languagema,
+ author = {Tom B. Brown and Benjamin Mann and Nick Ryder and Melanie Subbiah and J. Kaplan and Prafulla Dhariwal and Arvind Neelakantan and Pranav Shyam and Girish Sastry and Amanda Askell and Sandhini Agarwal and Ariel Herbert-Voss and Gretchen Krueger and T. Henighan and R. Child and A. Ramesh and Daniel M. Ziegler and Jeff Wu and Clemens Winter and Christopher Hesse and Mark Chen and Eric Sigler and Ma-teusz Litwin and Scott Gray and Benjamin Chess and Jack Clark and Christopher Berner and Sam McCandlish and Alec Radford and I. Sutskever and Dario Amodei},
+ booktitle = {Neural Information Processing Systems},
+ journal = {ArXiv},
+ title = {Language Models are Few-Shot Learners},
+ volume = {abs/2005.14165},
+ year = {2020}
+}
+
+% Pranav Rajpurkar et al. (2016) introduce the Stanford Question Answering Dataset (SQuAD), a large-scale Wikipedia-based reading comprehension benchmark with over 100,000 questions. We cite this in Experiments 2, 3, and 5 for baseline comparisons and evaluation metrics (exact match and F1) on standard QA tasks.
+@article{rajpurkar2016squad1q,
+ author = {Pranav Rajpurkar and Jian Zhang and Konstantin Lopyrev and Percy Liang},
+ booktitle = {Conference on Empirical Methods in Natural Language Processing},
+ pages = {2383-2392},
+ title = {SQuAD: 100,000+ Questions for Machine Comprehension of Text},
+ year = {2016}
+}
+
+% John D. Lee and Katrina A. See (2004) present the foundational framework "Trust in Automation: Designing for Appropriate Reliance" in Human Factors, which we cite in the methodology and experiments section to ground our use of Likert-scale trust ratings and the design of the human-in-the-loop trust study.
+@article{lee2004trustia,
+ author = {John D. Lee and Katrina A. See},
+ booktitle = {Hum. Factors},
+ journal = {Human Factors: The Journal of Human Factors and Ergonomics Society},
+ pages = {50 - 80},
+ title = {Trust in Automation: Designing for Appropriate Reliance},
+ volume = {46},
+ year = {2004}
+}
+
+% Kingma and Ba (2014) introduce the Adam optimizer, a first-order gradient-based optimization algorithm using adaptive estimates of lower-order moments. We cite this in the Experiments section when describing the optimizer used to train our two-layer MLP with dropout on the synthetic XOR task and during the QA evaluations.
+@article{kingma2014adamam,
+ author = {Diederik P. Kingma and Jimmy Ba},
+ booktitle = {International Conference on Learning Representations},
+ journal = {CoRR},
+ title = {Adam: A Method for Stochastic Optimization},
+ volume = {abs/1412.6980},
+ year = {2014}
+}
+
+% Lin et al. (2021) introduce TruthfulQA, a benchmark of 817 questions designed to measure whether language models generate truthful versus hallucinatory answers. We cite this in the introduction and in the experiments section when motivating the need to reduce hallucinations and comparing baseline hallucination rates to our Clarify-to-Retrieve results.
+@article{lin2021truthfulqamh,
+ author = {Stephanie C. Lin and Jacob Hilton and Owain Evans},
+ booktitle = {Annual Meeting of the Association for Computational Linguistics},
+ pages = {3214-3252},
+ title = {TruthfulQA: Measuring How Models Mimic Human Falsehoods},
+ year = {2021}
+}
+
+% Bernadette Tix et al. (2024) investigate how LLM-generated follow-up questions improve the quality of user-requested documents. We cite this in the Related Work section to underscore prior evidence that interactive question asking enhances output quality and user satisfaction, motivating our Clarify-to-Retrieve’s focused clarification step.
+@article{tix2024followupqi,
+ author = {Bernadette Tix},
+ booktitle = {arXiv.org},
+ journal = {ArXiv},
+ title = {Follow-Up Questions Improve Documents Generated by Large Language Models},
+ volume = {abs/2407.12017},
+ year = {2024}
+}
+
+% Guu et al. (2020) introduce REALM, a retrieval-augmented language model pre-training framework that jointly trains a latent knowledge retriever with masked language modeling to retrieve and attend over external documents during pretraining, fine-tuning, and inference. Cite in the introduction and related work to acknowledge the foundational paradigm of retrieval-augmented pretraining that underlies RAG and our Clarify-to-Retrieve approach.
+@article{guu2020realmrl,
+ author = {Kelvin Guu and Kenton Lee and Zora Tung and Panupong Pasupat and Ming-Wei Chang},
+ booktitle = {International Conference on Machine Learning},
+ journal = {ArXiv},
+ title = {REALM: Retrieval-Augmented Language Model Pre-Training},
+ volume = {abs/2002.08909},
+ year = {2020}
+}
+
+% Robertson & Zaragoza (2009) introduce the Probabilistic Relevance Framework (PRF) and the BM25 ranking algorithm, the standard sparse retrieval baseline. We cite this paper in the retrieval setup and Experiments 2 and 5 when comparing Dense Passage Retrieval to BM25.
+@article{robertson2009thepr,
+ author = {S. Robertson and H. Zaragoza},
+ booktitle = {Foundations and Trends in Information Retrieval},
+ journal = {Found. Trends Inf. Retr.},
+ pages = {333-389},
+ title = {The Probabilistic Relevance Framework: BM25 and Beyond},
+ volume = {3},
+ year = {2009}
+}
+
+% Ziliang Zhao et al. (2024) Generating Intent-aware Clarifying Questions in Conversational Information Retrieval Systems: Defines query intent and uses rule-based methods and a BART-based model with weak supervision to generate clarifying questions. Cite in Related Work when contrasting our uncertainty-driven, LLM-based clarification approach with prior IR-centric, intent-aware question generation techniques.
+@book{zhao2024generatingic,
+ author = {Ziliang Zhao and Zhicheng Dou and Yujia Zhou},
+ booktitle = {International Conference on Information and Knowledge Management},
+ journal = {Proceedings of the 33rd ACM International Conference on Information and Knowledge Management},
+ title = {Generating Intent-aware Clarifying Questions in Conversational Information Retrieval Systems},
+ year = {2024}
+}
+
+% Yang et al. (2018) introduce HotpotQA, a large-scale multi-hop QA dataset with over 113k question-answer pairs requiring reasoning over multiple documents and providing supporting facts for explainability. Cite in the Introduction and Related Work to contrast existing heavy multi-hop reasoning pipelines with our lightweight, clarification-driven retrieval framework.
+@article{yang2018hotpotqaad,
+ author = {Zhilin Yang and Peng Qi and Saizheng Zhang and Yoshua Bengio and William W. Cohen and R. Salakhutdinov and Christopher D. Manning},
+ booktitle = {Conference on Empirical Methods in Natural Language Processing},
+ pages = {2369-2380},
+ title = {HotpotQA: A Dataset for Diverse, Explainable Multi-hop Question Answering},
+ year = {2018}
+}

@@ -1,0 +1,48 @@
+This is BibTeX, Version 0.99d (TeX Live 2022/dev/Debian)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: template.aux
+The style file: iclr2025.bst
+Database file #1: references.bib
+Warning--empty booktitle in krizhevsky2009learningml
+You've used 13 entries,
+            2773 wiz_defined-function locations,
+            665 strings with 6849 characters,
+and the built_in function-call counts, 6763 in all, are:
+= -- 588
+> -- 478
+< -- 8
++ -- 160
+- -- 147
+* -- 554
+:= -- 1055
+add.period$ -- 39
+call.type$ -- 13
+change.case$ -- 88
+chr.to.int$ -- 13
+cite$ -- 27
+duplicate$ -- 291
+empty$ -- 481
+format.name$ -- 168
+if$ -- 1403
+int.to.chr$ -- 1
+int.to.str$ -- 1
+missing$ -- 13
+newline$ -- 73
+num.names$ -- 52
+pop$ -- 162
+preamble$ -- 1
+purify$ -- 75
+quote$ -- 0
+skip$ -- 255
+stack$ -- 0
+substring$ -- 203
+swap$ -- 40
+text.length$ -- 3
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 143
+warning$ -- 1
+while$ -- 54
+width$ -- 0
+write$ -- 173
+(There was 1 warning)

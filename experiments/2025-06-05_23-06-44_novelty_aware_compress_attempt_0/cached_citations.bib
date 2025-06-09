@@ -1,0 +1,86 @@
+
+% Rae et al. (2019) introduce the Compressive Transformer, an attentive sequence model that uses fixed time-based schedules to compress past memories for long-range sequence modeling. We cite this work in the Related Work section when contrasting fixed-rate compression to our entropy-aware adaptive compression mechanism.
+@article{rae2019compressivetf,
+ author = {Jack W. Rae and Anna Potapenko and Siddhant M. Jayakumar and T. Lillicrap},
+ booktitle = {International Conference on Learning Representations},
+ journal = {ArXiv},
+ title = {Compressive Transformers for Long-Range Sequence Modelling},
+ volume = {abs/1911.05507},
+ year = {2019}
+}
+
+% Transformer-XL: Attentive Language Models beyond a Fixed-Length Context (Dai et al., 2019) introduces segment-level recurrence and a novel positional encoding to enable learning dependencies beyond a fixed-length window without context fragmentation. Cited in Related Work as the fixed-context baseline contrasted with our entropy-aware adaptive compression.
+@article{dai2019transformerxlal,
+ author = {Zihang Dai and Zhilin Yang and Yiming Yang and J. Carbonell and Quoc V. Le and R. Salakhutdinov},
+ booktitle = {Annual Meeting of the Association for Computational Linguistics},
+ journal = {ArXiv},
+ title = {Transformer-XL: Attentive Language Models beyond a Fixed-Length Context},
+ volume = {abs/1901.02860},
+ year = {2019}
+}
+
+% Poli et al. (2023) introduce Hyena, a subquadratic drop-in replacement for attention using long convolutions and data-controlled gating. Cited in Related Work when contrasting prior compute-efficient architectures (Hyena) that reduce attention cost but do not provide adaptive memory buffering.
+@article{poli2023hyenaht,
+ author = {Michael Poli and Stefano Massaroli and Eric Q. Nguyen and Daniel Y. Fu and Tri Dao and S. Baccus and Y. Bengio and Stefano Ermon and Christopher Ré},
+ booktitle = {International Conference on Machine Learning},
+ pages = {28043-28078},
+ title = {Hyena Hierarchy: Towards Larger Convolutional Language Models},
+ year = {2023}
+}
+
+% Patrick Lewis et al. (2020) introduce Retrieval-Augmented Generation (RAG), a framework combining pre-trained parametric models with non-parametric memory via a dense Wikipedia index. We cite this work in the Experiments section to describe the RAG baseline for our retrieval-augmented QA evaluations.
+@article{lewis2020retrievalaugmentedgf,
+ author = {Patrick Lewis and Ethan Perez and Aleksandara Piktus and F. Petroni and Vladimir Karpukhin and Naman Goyal and Heinrich Kuttler and M. Lewis and Wen-tau Yih and Tim Rocktäschel and Sebastian Riedel and Douwe Kiela},
+ booktitle = {Neural Information Processing Systems},
+ journal = {ArXiv},
+ title = {Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks},
+ volume = {abs/2005.11401},
+ year = {2020}
+}
+
+% Sukhbaatar et al. (2019) propose Adaptive Attention Span in Transformers, a mechanism that learns per-head attention window sizes to control memory and computation cost. Cite this in the Related Work section to contrast fixed-span or learned-span attention approaches with our entropy-aware dynamic compression strategy.
+@article{sukhbaatar2019adaptiveas,
+ author = {Sainbayar Sukhbaatar and Edouard Grave and Piotr Bojanowski and Armand Joulin},
+ booktitle = {Annual Meeting of the Association for Computational Linguistics},
+ journal = {ArXiv},
+ title = {Adaptive Attention Span in Transformers},
+ volume = {abs/1905.07799},
+ year = {2019}
+}
+
+% Vaswani et al. (2017) 'Attention Is All You Need' introduces the original Transformer architecture based solely on self-attention, which serves as the foundational model for our Transformer-XL baseline and EA-ACM extension. Cite in the Related Work and Model sections to reference the core self-attention mechanism.
+@article{vaswani2017attentionia,
+ author = {Ashish Vaswani and Noam M. Shazeer and Niki Parmar and Jakob Uszkoreit and Llion Jones and Aidan N. Gomez and Lukasz Kaiser and Illia Polosukhin},
+ booktitle = {Neural Information Processing Systems},
+ pages = {5998-6008},
+ title = {Attention is All you Need},
+ year = {2017}
+}
+
+% Beltagy et al. (2020) introduce Longformer, a drop-in replacement for standard self-attention that scales linearly with sequence length via a combination of local windowed and global attention. We cite this work in the Related Work section to contrast prior sparse, subquadratic attention mechanisms and to reference the ArXiv summarization dataset used in our evaluations.
+@article{beltagy2020longformertl,
+ author = {Iz Beltagy and Matthew E. Peters and Arman Cohan},
+ booktitle = {arXiv.org},
+ journal = {ArXiv},
+ title = {Longformer: The Long-Document Transformer},
+ volume = {abs/2004.05150},
+ year = {2020}
+}
+
+% Simeng Sun et al. (2021) perform a fine-grained analysis of long-range Transformer language models (including one evaluated on PG-19) and show that they only exploit distant context for a small subset of tokens. Cite this in the Related Work or Discussion section to motivate the need for more effective, content-aware memory retention strategies like our entropy-guided compression.
+@article{sun2021doll,
+ author = {Simeng Sun and Kalpesh Krishna and Andrew Mattarella-Micke and Mohit Iyyer},
+ booktitle = {Conference on Empirical Methods in Natural Language Processing},
+ journal = {ArXiv},
+ title = {Do Long-Range Language Models Actually Use Long-Range Context?},
+ volume = {abs/2109.09115},
+ year = {2021}
+}
+
+% Claude E. Shannon’s foundational paper 'A Mathematical Theory of Communication' (1948) introduces the concept of entropy, which we use to compute token-level novelty in our EA-ACM method. Cite in the Methods section when defining the entropy-based importance score.
+@inproceedings{shannon2021amt,
+ author = {C. Shannon},
+ pages = {121-134},
+ title = {A Mathematical Theory of Communication (1948)},
+ year = {2021}
+}

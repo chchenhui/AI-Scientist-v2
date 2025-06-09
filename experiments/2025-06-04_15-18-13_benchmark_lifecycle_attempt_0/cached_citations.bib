@@ -1,0 +1,140 @@
+
+% Cite the original GLUE benchmark paper (Wang et al., EMNLP 2018) when introducing and discussing the GLUE suite as one of the key static evaluation benchmarks for natural language understanding.
+@article{wang2018glueam,
+ author = {Alex Wang and Amanpreet Singh and Julian Michael and Felix Hill and Omer Levy and Samuel R. Bowman},
+ booktitle = {BlackboxNLP@EMNLP},
+ pages = {353-355},
+ title = {GLUE: A Multi-Task Benchmark and Analysis Platform for Natural Language Understanding},
+ year = {2018}
+}
+
+% TWIN-ADAPT: Continuous Learning for Digital Twin–Enabled Online Anomaly Classification in IoT-Driven Smart Labs (Gupta et al., Future Internet 2024). Cite this work in the Related Work section when discussing prior domain drift adaptation methods in static ML benchmarks versus streaming IoT/CPS settings.
+@article{gupta2024twinadaptcl,
+ author = {Ragini Gupta and Beitong Tian and Yaohui Wang and Klara Nahrstedt},
+ booktitle = {Future Internet},
+ journal = {Future Internet},
+ pages = {239},
+ title = {TWIN-ADAPT: Continuous Learning for Digital Twin-Enabled Online Anomaly Classification in IoT-Driven Smart Labs},
+ volume = {16},
+ year = {2024}
+}
+
+% Cite LeCun et al. (1998) ‘Gradient-based learning applied to document recognition’ as the original paper introducing the MNIST dataset and convolutional networks when discussing MNIST as a canonical static vision benchmark.
+@article{lecun1998gradientbasedla,
+ author = {Yann LeCun and L. Bottou and Yoshua Bengio and P. Haffner},
+ booktitle = {Proceedings of the IEEE},
+ journal = {Proc. IEEE},
+ pages = {2278-2324},
+ title = {Gradient-based learning applied to document recognition},
+ volume = {86},
+ year = {1998}
+}
+
+% Recht et al. (ICML 2019) build new test sets for CIFAR-10 and ImageNet to quantify performance drops due to distribution shifts in static benchmarks. Cite this work in Related Work when discussing empirical evidence of benchmark decay and motivating the need for our decay metrics and rejuvenation pipeline in vision tasks.
+@article{recht2019doic,
+ author = {B. Recht and R. Roelofs and Ludwig Schmidt and Vaishaal Shankar},
+ booktitle = {International Conference on Machine Learning},
+ pages = {5389-5400},
+ title = {Do ImageNet Classifiers Generalize to ImageNet?},
+ year = {2019}
+}
+
+% Cite the original SQuAD paper (Rajpurkar et al., EMNLP 2016) when introducing and discussing SQuAD as a canonical static benchmark for machine reading comprehension, including its dataset statistics, baseline model performance, and human upper bound.
+@article{rajpurkar2016squad1q,
+ author = {Pranav Rajpurkar and Jian Zhang and Konstantin Lopyrev and Percy Liang},
+ booktitle = {Conference on Empirical Methods in Natural Language Processing},
+ pages = {2383-2392},
+ title = {SQuAD: 100,000+ Questions for Machine Comprehension of Text},
+ year = {2016}
+}
+
+% Cite Karras et al. (2019) 'Analyzing and Improving the Image Quality of StyleGAN' as the foundational StyleGAN2 architecture used in our vision rejuvenation pipeline for generating high-quality synthetic test images. Reference this in the Methods section when describing the conditional GAN setup.
+@article{karras2019analyzingai,
+ author = {Tero Karras and S. Laine and M. Aittala and Janne Hellsten and J. Lehtinen and Timo Aila},
+ booktitle = {Computer Vision and Pattern Recognition},
+ journal = {2020 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+ pages = {8107-8116},
+ title = {Analyzing and Improving the Image Quality of StyleGAN},
+ year = {2019}
+}
+
+% Heusel et al. (2017) introduce the Two Time-Scale Update Rule for GAN training and, importantly, propose the Fréchet Inception Distance (FID) as a metric for evaluating GAN-generated image quality. Cite this work in the Methods section when describing the FID-based automatic quality filtering for synthetic vision samples.
+@article{heusel2017ganstb,
+ author = {M. Heusel and Hubert Ramsauer and Thomas Unterthiner and Bernhard Nessler and Sepp Hochreiter},
+ booktitle = {Neural Information Processing Systems},
+ pages = {6626-6637},
+ title = {GANs Trained by a Two Time-Scale Update Rule Converge to a Local Nash Equilibrium},
+ year = {2017}
+}
+
+% Cite the original CIFAR-10 dataset paper (Krizhevsky et al., 2009) when introducing CIFAR-10 as one of the canonical vision benchmarks in our study.
+@inproceedings{krizhevsky2009learningml,
+ author = {A. Krizhevsky},
+ title = {Learning Multiple Layers of Features from Tiny Images},
+ year = {2009}
+}
+
+% Alec Radford et al. (2019) 'Language Models are Unsupervised Multitask Learners' introduces GPT-2, the model we employ for conditional text generation in our rejuvenation pipeline. Cite this in the Methods section when describing how we generate synthetic language samples targeting high-uncertainty regions.
+@inproceedings{radford2019languagema,
+ author = {Alec Radford and Jeff Wu and R. Child and D. Luan and Dario Amodei and I. Sutskever},
+ title = {Language Models are Unsupervised Multitask Learners},
+ year = {2019}
+}
+
+% Cite the original ImageNet dataset paper (Deng et al., CVPR 2009) when introducing and discussing ImageNet as a canonical static vision benchmark, including its hierarchical structure, dataset statistics, and role in driving large-scale image recognition research.
+@article{none,
+ booktitle = {Eye & contact lens},
+ journal = {Eye & Contact Lens: Science & Clinical Practice},
+ title = {Postoperative Endophthalmitis Before and After Preferred Utilization of Prophylactic Intracameral Antibiotics for Phacoemulsification Cataract Surgeries at Cole Eye Institute: Erratum.},
+ year = {2020}
+}
+
+% Explaining and Harnessing Adversarial Examples (Goodfellow et al., ICLR 2015) introduces the fast gradient sign method for generating adversarial examples; cite this in the Related Work section when discussing adversarial and synthetic data augmentation methods for creating challenging benchmark samples.
+@article{goodfellow2014explainingah,
+ author = {I. Goodfellow and Jonathon Shlens and Christian Szegedy},
+ booktitle = {International Conference on Learning Representations},
+ journal = {CoRR},
+ title = {Explaining and Harnessing Adversarial Examples},
+ volume = {abs/1412.6572},
+ year = {2014}
+}
+
+% Cite Deng et al. (2009) 'ImageNet: A large-scale hierarchical image database' when introducing and discussing ImageNet as a canonical static vision benchmark, including its hierarchical structure, dataset statistics, and impact on image recognition research.
+@article{deng2009imagenetal,
+ author = {Jia Deng and Wei Dong and R. Socher and Li-Jia Li and K. Li and Li Fei-Fei},
+ booktitle = {2009 IEEE Conference on Computer Vision and Pattern Recognition},
+ journal = {2009 IEEE Conference on Computer Vision and Pattern Recognition},
+ pages = {248-255},
+ title = {ImageNet: A large-scale hierarchical image database},
+ year = {2009}
+}
+
+% Cite Lakshminarayanan et al. (NeurIPS 2016) 'Simple and Scalable Predictive Uncertainty Estimation using Deep Ensembles' when describing the use of model ensembles to measure predictive uncertainty for targeting high-uncertainty regions in the rejuvenation pipeline. This seminal work introduces deep ensembles as a simple yet effective method for well-calibrated uncertainty estimation in deep networks and is referenced in the Methods section.
+@article{lakshminarayanan2016simpleas,
+ author = {Balaji Lakshminarayanan and A. Pritzel and C. Blundell},
+ booktitle = {Neural Information Processing Systems},
+ pages = {6402-6413},
+ title = {Simple and Scalable Predictive Uncertainty Estimation using Deep Ensembles},
+ year = {2016}
+}
+
+% Cite the foundational JMLR 2012 paper 'A Kernel Two-Sample Test' by Gretton et al., which introduces the Maximum Mean Discrepancy (MMD) two-sample test in an RKHS. Reference this when defining and computing distributional shift indices for our decay metrics.
+@article{gretton2012akt,
+ author = {A. Gretton and Karsten M. Borgwardt and M. Rasch and B. Scholkopf and Alex Smola},
+ booktitle = {Journal of machine learning research},
+ journal = {J. Mach. Learn. Res.},
+ pages = {723-773},
+ title = {A Kernel Two-Sample Test},
+ volume = {13},
+ year = {2012}
+}
+
+% Cite SuperGLUE (Wang et al., NeurIPS 2019) as a successor to GLUE designed to overcome saturation by introducing more difficult language understanding tasks. Reference this in the Related Work section when discussing how benchmarks evolve to maintain challenge over time.
+@article{wang2019superglueas,
+ author = {Alex Wang and Yada Pruksachatkun and Nikita Nangia and Amanpreet Singh and Julian Michael and Felix Hill and Omer Levy and Samuel R. Bowman},
+ booktitle = {Neural Information Processing Systems},
+ journal = {ArXiv},
+ title = {SuperGLUE: A Stickier Benchmark for General-Purpose Language Understanding Systems},
+ volume = {abs/1905.00537},
+ year = {2019}
+}

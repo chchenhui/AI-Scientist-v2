@@ -1,0 +1,96 @@
+
+% P. Cousot and R. Cousot (1977): 'A Unified Lattice Model for Static Analysis of Programs by Construction or Approximation,' the foundational work introducing abstract interpretation and lattice-based static analysis. Cite in the Related Work section when defining abstract interpretation.
+@misc{none,
+ author = {P. Cousot and R. Cousot},
+ title = {INTERPRETATION : ‘A UNIFIED LATTICE MODEL FOR STATIC ANALYSIS OF PROGRAMS BY CONSTRUCTION OR APPROXIMATION}
+}
+
+% Cite Iyer et al. (2019) when discussing grammar‐constrained decoding: they present a neural model for mapping natural language descriptions to general‐purpose source code by incorporating syntactic constraints (e.g., AST‐guided decoding) to ensure syntactic correctness.
+@inproceedings{iyer2019learningtm,
+ author = {Srini Iyer},
+ title = {Learning to Map Natural Language to General Purpose Source Code},
+ year = {2019}
+}
+
+% Mark Chen et al. (2021) introduce Codex and the HumanEval benchmark for evaluating Python code generation; cite in the Experiments section when describing HumanEval.
+@article{chen2021evaluatingll,
+ author = {Mark Chen and Jerry Tworek and Heewoo Jun and Qiming Yuan and Henrique Pondé and Jared Kaplan and Harrison Edwards and Yura Burda and Nicholas Joseph and Greg Brockman and Alex Ray and Raul Puri and Gretchen Krueger and Michael Petrov and Heidy Khlaaf and Girish Sastry and Pamela Mishkin and Brooke Chan and Scott Gray and Nick Ryder and Mikhail Pavlov and Alethea Power and Lukasz Kaiser and Mo Bavarian and Clemens Winter and Phil Tillet and F. Such and D. Cummings and Matthias Plappert and Fotios Chantzis and Elizabeth Barnes and Ariel Herbert-Voss and William H. Guss and Alex Nichol and Igor Babuschkin and S. Balaji and Shantanu Jain and A. Carr and Jan Leike and Josh Achiam and Vedant Misra and Evan Morikawa and Alec Radford and M. Knight and Miles Brundage and Mira Murati and Katie Mayer and P. Welinder and Bob McGrew and Dario Amodei and Sam McCandlish and I. Sutskever and Wojciech Zaremba},
+ booktitle = {arXiv.org},
+ journal = {ArXiv},
+ title = {Evaluating Large Language Models Trained on Code},
+ volume = {abs/2107.03374},
+ year = {2021}
+}
+
+% Cite the original Z3 SMT solver paper (“Satisfiability Modulo Bit-precise Theories for Program Exploration” by N. Tillmann, L. D. Moura, and N. S. Bjørner, TACAS 2008) when describing the SMT-guided repair baseline in the Experiments section.
+@inproceedings{bjrner2008satisfiabilitymb,
+ author = {Nikolaj S. Bjørner and L. D. Moura and N. Tillmann},
+ title = {Satisfiability Modulo Bit-precise Theories for Program Exploration},
+ year = {2008}
+}
+
+% Citation for the Mostly Basic Python Problems (MBPP) dataset introduced by Austin et al. (2021) in “Program Synthesis with Large Language Models.” Contains 974 entry-level Python tasks; cite in the Experiments section when describing MBPP.
+@article{austin2021programsw,
+ author = {Jacob Austin and Augustus Odena and Maxwell Nye and Maarten Bosma and H. Michalewski and David Dohan and Ellen Jiang and Carrie J. Cai and Michael Terry and Quoc V. Le and Charles Sutton},
+ booktitle = {arXiv.org},
+ journal = {ArXiv},
+ title = {Program Synthesis with Large Language Models},
+ volume = {abs/2108.07732},
+ year = {2021}
+}
+
+% J. Lehtosalo and D. Greaves (2011): 'Language with a Pluggable Type System and Optional Runtime Monitoring of Type Errors,' the original Mypy paper describing an optional static type checker for Python. Cite in the Methods section when referencing our use of Mypy plugins for abstract interpretation.
+@inproceedings{lehtosalo2011languagewa,
+ author = {J. Lehtosalo and D. Greaves},
+ title = {Language with a Pluggable Type System and Optional Runtime Monitoring of Type Errors},
+ year = {2011}
+}
+
+% Cite 'Zero-shot Reading Comprehension and Reasoning for Spanish with BERTIN GPT-J-6B' when introducing GPT-J-6B as our baseline code-generation LLM in the Experiments section. This paper details the GPT-J-6B autoregressive model architecture and setup from EleutherAI, which we use off-the-shelf.
+@article{rosa2022zeroshotrc,
+ author = {Javier Casas-de la Rosa and A. Fernandez},
+ booktitle = {IberLEF@SEPLN},
+ title = {Zero-shot Reading Comprehension and Reasoning for Spanish with BERTIN GPT-J-6B},
+ year = {2022}
+}
+
+% Cite Wei et al. (2022) 'Chain of Thought Prompting Elicits Reasoning in Large Language Models' when justifying the use of natural-language constraints (analogous to chain-of-thought prompts) in guiding code generation via abstract-interpretation feedback loops.
+@article{wei2022chainot,
+ author = {Jason Wei and Xuezhi Wang and Dale Schuurmans and Maarten Bosma and Ed H. Chi and F. Xia and Quoc Le and Denny Zhou},
+ booktitle = {Neural Information Processing Systems},
+ journal = {ArXiv},
+ title = {Chain of Thought Prompting Elicits Reasoning in Large Language Models},
+ volume = {abs/2201.11903},
+ year = {2022}
+}
+
+% SemFix: Program Repair via Semantic Analysis (ICSE 2013) – the seminal work that integrates semantic analysis with SMT solving to automatically generate program patches. Cite in the Experiments section when describing the SMT-guided repair baseline.
+@article{nguyen2013semfixpr,
+ author = {Hoang D. T. Nguyen and Dawei Qi and Abhik Roychoudhury and S. Chandra},
+ booktitle = {International Conference on Software Engineering},
+ journal = {2013 35th International Conference on Software Engineering (ICSE)},
+ pages = {772-781},
+ title = {SemFix: Program repair via semantic analysis},
+ year = {2013}
+}
+
+% Cite Schick and Schütze (2020) “It’s Not Just Size That Matters: Small Language Models Are Also Few-Shot Learners” when motivating our use of GPT-J-6B with prompt-based feedback loops (no fine-tuning). This paper demonstrates that smaller LMs can achieve few-shot performance via natural-language prompts, supporting our design choice.
+@article{schick2020itsnj,
+ author = {Timo Schick and Hinrich Schütze},
+ booktitle = {North American Chapter of the Association for Computational Linguistics},
+ journal = {ArXiv},
+ title = {It’s Not Just Size That Matters: Small Language Models Are Also Few-Shot Learners},
+ volume = {abs/2009.07118},
+ year = {2020}
+}
+
+% Ernst et al. (2007): The Daikon system for dynamic detection of likely invariants. Cite in the Related Work section to contrast our static abstract-interpretation approach with dynamic invariant inference techniques.
+@article{ernst2007theds,
+ author = {Michael D. Ernst and J. Perkins and Philip J. Guo and Stephen McCamant and Carlos Pacheco and Matthew S. Tschantz and Chen Xiao},
+ booktitle = {Science of Computer Programming},
+ journal = {Sci. Comput. Program.},
+ pages = {35-45},
+ title = {The Daikon system for dynamic detection of likely invariants},
+ volume = {69},
+ year = {2007}
+}

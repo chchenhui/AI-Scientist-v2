@@ -1,0 +1,24 @@
+%% ===== Minimal edits to compress whitespace =====
+%% Place these right after \documentclass[…]{…}
+
+% 1) Tighter float spacing
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{6pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+
+% 2) Smaller caption gaps
+\setlength{\abovecaptionskip}{4pt}
+\setlength{\belowcaptionskip}{4pt}
+
+% 3) More permissive line breaking
+\sloppy
+
+% 4) Compact itemize/enumerate (if you have any lists)
+\usepackage{enumitem}
+\setlist[itemize,enumerate]{nosep, topsep=2pt, partopsep=0pt, parsep=0pt}
+
+% 5) Zero paragraph skips (ICLR style usually has none, but in case)
+\setlength{\parskip}{0pt}
+%\setlength{\parindent}{1em}  % if you prefer indenting rather than vertical skip
+
+%% ===== End of minimal edits =====

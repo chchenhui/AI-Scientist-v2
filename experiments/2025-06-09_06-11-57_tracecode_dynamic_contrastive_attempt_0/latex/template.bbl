@@ -1,0 +1,83 @@
+\begin{thebibliography}{11}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Ding et~al.(2023)Ding, Chakraborty, Buratti, Pujar, Morari, Kaiser,
+  and Ray]{ding2023concordcc}
+Yangruibo Ding, Saikat Chakraborty, Luca Buratti, Saurabh Pujar, Alessandro
+  Morari, Gail~E. Kaiser, and Baishakhi Ray.
+\newblock Concord: Clone-aware contrastive learning for source code.
+\newblock \emph{Proceedings of the 32nd ACM SIGSOFT International Symposium on
+  Software Testing and Analysis}, 2023.
+
+\bibitem[Guo et~al.(2020)Guo, Ren, Lu, Feng, Tang, Liu, Zhou, Duan, Yin, Jiang,
+  and Zhou]{guo2020graphcodebertpc}
+Daya Guo, Shuo Ren, Shuai Lu, Zhangyin Feng, Duyu Tang, Shujie Liu, Long Zhou,
+  Nan Duan, Jian Yin, Daxin Jiang, and M.~Zhou.
+\newblock Graphcodebert: Pre-training code representations with data flow.
+\newblock \emph{ArXiv}, abs/2009.08366, 2020.
+
+\bibitem[Huang et~al.(2024)Huang, Zhao, Rong, Guo, He, and
+  Chen]{huang2024coderp}
+Jiabo Huang, Jianyu Zhao, Yuyang Rong, Yiwen Guo, Yifeng He, and Hao Chen.
+\newblock Code representation pre-training with complements from program
+  executions.
+\newblock pp.\  267--278, 2024.
+
+\bibitem[Jain et~al.(2020)Jain, Jain, Zhang, Abbeel, Gonzalez, and
+  Stoica]{jain2020contrastivecr}
+Paras Jain, Ajay Jain, Tianjun Zhang, P.~Abbeel, Joseph~E. Gonzalez, and Ion
+  Stoica.
+\newblock Contrastive code representation learning.
+\newblock pp.\  5954--5971, 2020.
+
+\bibitem[Kingma \& Ba(2014)Kingma and Ba]{kingma2014adamam}
+Diederik~P. Kingma and Jimmy Ba.
+\newblock Adam: A method for stochastic optimization.
+\newblock \emph{CoRR}, abs/1412.6980, 2014.
+
+\bibitem[Liu et~al.(2023)Liu, Wu, Xie, Meng, and Liu]{liu2023contrabertec}
+Shangqing Liu, Bozhi Wu, Xiaofei Xie, Guozhu Meng, and Yang Liu.
+\newblock Contrabert: Enhancing code pre-trained models via contrastive
+  learning.
+\newblock pp.\  2476--2487, 2023.
+
+\bibitem[MacIver \& Hatfield-Dodds(2019)MacIver and
+  Hatfield-Dodds]{maciver2019hypothesisan}
+D.~MacIver and Zac Hatfield-Dodds.
+\newblock Hypothesis: A new approach to property-based testing.
+\newblock \emph{J. Open Source Softw.}, 4:\penalty0 1891, 2019.
+
+\bibitem[van~den Oord et~al.(2018)van~den Oord, Li, and
+  Vinyals]{oord2018representationlw}
+A{\"a}ron van~den Oord, Yazhe Li, and Oriol Vinyals.
+\newblock Representation learning with contrastive predictive coding.
+\newblock \emph{ArXiv}, abs/1807.03748, 2018.
+
+\bibitem[Vaswani et~al.(2017)Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez,
+  Kaiser, and Polosukhin]{vaswani2017attentionia}
+Ashish Vaswani, Noam~M. Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones,
+  Aidan~N. Gomez, Lukasz Kaiser, and Illia Polosukhin.
+\newblock Attention is all you need.
+\newblock pp.\  5998--6008, 2017.
+
+\bibitem[Wang et~al.(2022)Wang, Wang, Wan, Wang, Zhou, Li, Wu, and
+  Liu]{wang2022codemvplt}
+Xin Wang, Yasheng Wang, Yao Wan, Jiawei Wang, Pingyi Zhou, Li~Li, Hao Wu, and
+  Jin Liu.
+\newblock Code-mvp: Learning to represent source code from multiple views with
+  contrastive pre-training.
+\newblock pp.\  1066--1077, 2022.
+
+\bibitem[Zou et~al.(2021)Zou, Wang, Xu, Li, and
+  Jin]{zou2021inlineformulatexmathnx}
+Deqing Zou, Sujuan Wang, Shouhuai Xu, Zhen Li, and Hai Jin.
+\newblock μvuldeepecker: A deep learning-based system for multiclass
+  vulnerability detection.
+\newblock \emph{IEEE Trans. Dependable Secure Comput.}, 18:\penalty0
+  2224--2236, 2021.
+
+\end{thebibliography}

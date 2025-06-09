@@ -1,0 +1,70 @@
+\begin{thebibliography}{10}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Amershi et~al.(2014)Amershi, Cakmak, Knox, and
+  Kulesza]{amershi2014powertt}
+Saleema Amershi, M.~Cakmak, W.~B. Knox, and Todd Kulesza.
+\newblock Power to the people: The role of humans in interactive machine
+  learning.
+\newblock \emph{AI Mag.}, 35:\penalty0 105--120, 2014.
+
+\bibitem[Doshi-Velez \& Kim(2017)Doshi-Velez and Kim]{doshi-velez2017towardsar}
+F.~Doshi-Velez and Been Kim.
+\newblock Towards a rigorous science of interpretable machine learning.
+\newblock \emph{arXiv:1702.08608}, 2017.
+
+\bibitem[Kingma \& Ba(2014)Kingma and Ba]{kingma2014adamam}
+Diederik~P. Kingma and Jimmy Ba.
+\newblock Adam: A method for stochastic optimization.
+\newblock \emph{CoRR}, abs/1412.6980, 2014.
+
+\bibitem[Kulesza et~al.(2015)Kulesza, Burnett, Wong, and
+  Stumpf]{kulesza2015principlesoe}
+Todd Kulesza, M.~Burnett, Weng-Keen Wong, and S.~Stumpf.
+\newblock Principles of explanatory debugging to personalize interactive
+  machine learning.
+\newblock In \emph{Proceedings of the 20th International Conference on
+  Intelligent User Interfaces}, 2015.
+
+\bibitem[Lundberg \& Lee(2017)Lundberg and Lee]{lundberg2017aua}
+Scott~M. Lundberg and Su-In Lee.
+\newblock A unified approach to interpreting model predictions.
+\newblock In \emph{Neural Information Processing Systems}, pp.\  4765--4774,
+  2017.
+
+\bibitem[Miller(2017)]{miller2017explanationia}
+Tim Miller.
+\newblock Explanation in artificial intelligence: Insights from the social
+  sciences.
+\newblock \emph{ArXiv}, abs/1706.07269, 2017.
+
+\bibitem[Poursabzi-Sangdeh et~al.(2018)Poursabzi-Sangdeh, Goldstein, Hofman,
+  Vaughan, and Wallach]{poursabzi-sangdeh2018manipulatingam}
+Forough Poursabzi-Sangdeh, D.~Goldstein, Jake~M. Hofman, Jennifer~Wortman
+  Vaughan, and Hanna~M. Wallach.
+\newblock Manipulating and measuring model interpretability.
+\newblock In \emph{Proceedings of the 2021 CHI Conference on Human Factors in
+  Computing Systems}, 2018.
+
+\bibitem[Ribeiro et~al.(2016)Ribeiro, Singh, and Guestrin]{ribeiro2016whysi}
+Marco~Tulio Ribeiro, Sameer Singh, and Carlos Guestrin.
+\newblock “why should i trust you?”: Explaining the predictions of any
+  classifier.
+\newblock In \emph{Proceedings of the 22nd ACM SIGKDD International Conference
+  on Knowledge Discovery and Data Mining}, 2016.
+
+\bibitem[Sweller(1988)]{sweller1988cognitiveld}
+J.~Sweller.
+\newblock Cognitive load during problem solving: Effects on learning.
+\newblock \emph{Cogn. Sci.}, 12:\penalty0 257--285, 1988.
+
+\bibitem[Tversky \& Kahneman(1974)Tversky and Kahneman]{tversky1974judgmentuu}
+A.~Tversky and Daniel Kahneman.
+\newblock Judgment under uncertainty: Heuristics and biases.
+\newblock \emph{Science}, 185:\penalty0 1124--1131, 1974.
+
+\end{thebibliography}

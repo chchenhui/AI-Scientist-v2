@@ -1,0 +1,24 @@
+% ====== BEGIN MINIMAL PAGE‐SAVING TWEAKS ======
+% 1) More compact section headings
+\usepackage[compact]{titlesec}
+\titlespacing*{\section}{0pt}{*0.8}{*0.6}
+\titlespacing*{\subsection}{0pt}{*0.6}{*0.4}
+
+% 2) Reduce space above/below floats
+\setlength{\textfloatsep}{8pt plus 1pt minus 1pt}
+\setlength{\intextsep}{8pt plus 1pt minus 1pt}
+
+% 3) Shrink caption font & spacing
+\usepackage[font=small,skip=2pt]{caption}
+
+% 4) Tighter list spacing (if you must use itemize)
+\usepackage{enumitem}
+\setlist[itemize]{topsep=2pt,parsep=0pt,partopsep=0pt,itemsep=2pt}
+
+% 5) Reduce paragraph spacing
+\setlength{\parskip}{0.5em}
+
+% 6) Allow slightly more float placement flexibility
+\renewcommand{\textfraction}{.07}
+\renewcommand{\floatpagefraction}{.85}
+% ====== END MINIMAL PAGE‐SAVING TWEAKS ======

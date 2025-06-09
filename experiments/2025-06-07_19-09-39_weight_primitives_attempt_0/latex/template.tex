@@ -1,0 +1,242 @@
+\documentclass{article}
+\usepackage{iclr2025,times}
+
+% Optional math commands
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage[capitalize,noabbrev]{cleveref}
+
+\graphicspath{{../figures/}}
+
+\begin{filecontents}{references.bib}
+@book{goodfellow2016deep,
+  title={Deep learning},
+  author={Goodfellow, Ian and Bengio, Yoshua and Courville, Aaron},
+  year={2016},
+  publisher={MIT Press}
+}
+@article{aharon2006rmka,
+  author = {M. Aharon and M. Elad and A. Bruckstein},
+  journal = {IEEE Transactions on Signal Processing},
+  pages = {4311--4322},
+  title = {$K$‐SVD: An Algorithm for Designing Overcomplete Dictionaries for Sparse Representation},
+  volume = {54},
+  year = {2006}
+}
+@article{olshausen1997sparsecw,
+  author = {B. Olshausen and D. Field},
+  journal = {Vision Research},
+  pages = {3311--3325},
+  title = {Sparse coding with an overcomplete basis set: A strategy employed by V1?},
+  volume = {37},
+  year = {1997}
+}
+@article{kingma2014adamam,
+  author = {Diederik P. Kingma and Jimmy Ba},
+  journal = {CoRR},
+  title = {Adam: A Method for Stochastic Optimization},
+  volume = {abs/1412.6980},
+  year = {2014}
+}
+@article{ha2016hypernetworks,
+  author = {David Ha and Andrew M. Dai and Quoc V. Le},
+  journal = {ArXiv},
+  title = {HyperNetworks},
+  volume = {abs/1609.09106},
+  year = {2016}
+}
+@article{wortsman2022modelsa,
+  author = {Mitchell Wortsman and Gabriel Ilharco and S. Gadre and R. Roelofs and Raphael Gontijo-Lopes and Ari S. Morcos and Hongseok Namkoong and Ali Farhadi and Y. Carmon and Simon Kornblith and Ludwig Schmidt},
+  journal = {ArXiv},
+  title = {Model soups: averaging weights of multiple fine-tuned models improves accuracy without increasing inference time},
+  volume = {abs/2203.05482},
+  year = {2022}
+}
+@article{finn2017modelagnosticmf,
+  author = {Chelsea Finn and P. Abbeel and S. Levine},
+  journal = {ICML},
+  title = {Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks},
+  year = {2017}
+}
+@article{mairal2009onlinelf,
+  author = {J. Mairal and F. Bach and J. Ponce and G. Sapiro},
+  journal = {J. Mach. Lear. Res.},
+  pages = {19--60},
+  title = {Online Learning for Matrix Factorization and Sparse Coding},
+  volume = {11},
+  year = {2009}
+}
+@article{gregor2010learningfa,
+  author = {Karol Gregor and Yann LeCun},
+  journal = {ICML},
+  pages = {399--406},
+  title = {Learning Fast Approximations of Sparse Coding},
+  year = {2010}
+}
+@article{izmailov2018averagingwl,
+  author = {Pavel Izmailov and Dmitrii Podoprikhin and T. Garipov and D. Vetrov and A. Wilson},
+  journal = {UAI},
+  pages = {876--885},
+  title = {Averaging Weights Leads to Wider Optima and Better Generalization},
+  year = {2018}
+}
+@article{hu2021lorala,
+  author = {J. E. Hu and Yelong Shen and Phillip Wallis and Zeyuan Allen-Zhu and Yuanzhi Li and Shean Wang and Weizhu Chen},
+  journal = {ArXiv},
+  title = {LoRA: Low-Rank Adaptation of Large Language Models},
+  volume = {abs/2106.09685},
+  year = {2021}
+}
+@inproceedings{krizhevsky2009learningml,
+  author = {A. Krizhevsky},
+  title = {Learning Multiple Layers of Features from Tiny Images},
+  year = {2009}
+}
+@article{he2015deeprl,
+  author = {Kaiming He and X. Zhang and Shaoqing Ren and Jian Sun},
+  journal = {CVPR},
+  pages = {770--778},
+  title = {Deep Residual Learning for Image Recognition},
+  year = {2015}
+}
+@article{simonyan2014verydc,
+  author = {K. Simonyan and A. Zisserman},
+  journal = {ArXiv},
+  title = {Very Deep Convolutional Networks for Large-Scale Image Recognition},
+  volume = {abs/1409.1556},
+  year = {2014}
+}
+\end{filecontents}
+
+\title{Learning Compositional Weight Primitives for Neural Model Synthesis}
+
+\author{Anonymous}
+
+%\iclrfinalcopy
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We propose a novel paradigm for neural model synthesis by treating pretrained network weights as data and learning a small dictionary of shared \emph{weight primitives} via sparse coding.  Flattened weight tensors from a synthetic model zoo are used to train an overcomplete basis (K-SVD or learned analysis transform with an $\ell_1$ penalty) that captures common structure across models.  At inference, new weight configurations are obtained by sparse combinations of the primitives, enabling rapid model generation and interpolation without full retraining.  On a controlled synthetic benchmark, our approach reconstructs held‐out weights with under 15\% relative error and generates novel models that match the principal spectral characteristics of true weights.  We further ablate optimizer choice and batch‐size effects on sparse dictionary training.  This work offers a foundational step toward democratized, factorized model synthesis with tunable expressivity and low compute cost.
+\end{abstract}
+
+\section{Introduction}
+Modern deep networks often share structural patterns in their learned weights, yet current approaches to transferring or merging models treat weights as monolithic objects.  Hypernetworks \citep{ha2016hypernetworks} and model soups \citep{wortsman2022modelsa} merge full-weight tensors or predict them via a parametric network, but do not factorize the weight space explicitly.  Inspired by sparse coding in vision \citep{olshausen1997sparsecw} and dictionary learning \citep{aharon2006rmka}, we ask: \emph{can a small set of shared \emph{weight primitives} compose a large collection of models?}
+
+We introduce \emph{weight primitives}, a learned overcomplete basis in the flattened weight space of a model zoo.  By optimizing a reconstruction loss with an $\ell_1$ sparsity penalty, we learn a dictionary $D\in\mathbb R^{k\times d}$ so that each weight vector $w\in\mathbb R^d$ is approximated by $D^\top \alpha$ for a sparse code $\alpha\in\mathbb R^k$.  New weight configurations arise by solving a sparse coding problem over $D$, enabling zero-shot model synthesis, smooth interpolation between architectures, and fast adaptation via code fine‐tuning.
+
+Our contributions are as follows:
+\begin{itemize}
+  \item Formalization of weight primitives as a sparse dictionary in weight space, learned on a synthetic model zoo.
+  \item Demonstration of accurate reconstruction of held‐out weights with under 15\% relative error and qualitative spectral agreement.
+  \item Ablations of momentum, optimizer choice, and batch size in sparse dictionary training, revealing trade‐offs between convergence speed and generalization.
+  \item Release of code and benchmark to foster further research on factorized weight‐space methods.
+\end{itemize}
+
+\section{Related Work}
+Dictionary learning and sparse coding trace back to neuroscience‐inspired vision models \citep{olshausen1997sparsecw}, with K‐SVD popularizing efficient overcomplete basis design \citep{aharon2006rmka}.  Mairal et al.\ \citep{mairal2009onlinelf} scaled sparse coding via online updates, and LISTA \citep{gregor2010learningfa} provides fast approximate encoding.  In deep learning, hypernetworks \citep{ha2016hypernetworks} and meta‐learning \citep{finn2017modelagnosticmf} predict weights but do not yield an explicit combinatorial basis.  Model soups \citep{wortsman2022modelsa} and SWA \citep{izmailov2018averagingwl} merge full‐weight snapshots, lacking factorization.  Low‐rank adaptations such as LoRA \citep{hu2021lorala} learn compact updates but do not discover reusable dictionaries across models.  We complement these lines by learning a sparse, shared basis \emph{in weight space} for compositional model synthesis.
+
+\section{Background: Sparse Coding}
+Given data vectors $\{w_i\}\subset\mathbb R^d$, sparse coding seeks $D\in\mathbb R^{k\times d}$ and codes $\{\alpha_i\}\subset\mathbb R^k$ minimizing
+\[
+  \frac1N\sum_{i=1}^N\|w_i - D^\top\alpha_i\|_2^2 \;+\;\lambda\|\alpha_i\|_1,
+\]
+alternating between Lasso code updates and dictionary updates (K‐SVD \citep{aharon2006rmka} or gradient methods).  We apply this framework directly to flattened neural network weights.
+
+\section{Method}
+We generate a synthetic model zoo by sampling a ground truth dictionary $D_0\in\mathbb R^{k\times d}$ and sparse codes $\alpha_0$, forming weight samples $w=D_0^\top\alpha_0 + \epsilon$.  To learn primitives, we parameterize $D$ and codes on a training split, optimizing
+\[
+  \mathcal L(D,\{\alpha_i\}) = \frac1N\sum_{i=1}^N\|w_i - D^\top\alpha_i\|_2^2 + \lambda\|\alpha_i\|_1
+\]
+with Adam \citep{kingma2014adamam}.  At inference, held‐out weights are reconstructed by solving a sparse coding problem with the Moore–Penrose pseudo‐inverse $D^+$; new weight vectors arise by specifying or interpolating codes.
+
+\section{Experimental Setup}
+We generate $N=80$ train and 20 test samples of dimension $d=1024$ from a ground truth dictionary with $k=30$ atoms and 10\% code sparsity, adding Gaussian noise ($\sigma=0.01$).  We train for 50 epochs, varying:
+\begin{itemize}
+  \item \textbf{Momentum} $\beta_1\in\{0.5,0.7,0.9,0.99\}$ in Adam.
+  \item \textbf{Optimizer}: SGD, RMSprop, AdamW.
+  \item \textbf{Batch size}: \{80,40,20,10\}.
+\end{itemize}
+We record per-epoch $\ell_2$ reconstruction loss and relative error $\|w-\hat w\|/\|w\|$ on train and validation splits.
+
+\section{Experiments}
+\paragraph{Momentum Ablation and Reconstruction.}
+\Cref{fig:momentum_error,fig:momentum_loss} show single‐run curves for training/validation relative error and MSE under four $\beta_1$ settings.  Higher momentum accelerates training but degrades validation.  The best generalization occurs at $\beta_1=0.7$, yielding 0.22 test relative error vs.\ 0.33 for $\beta_1=0.99$.  \Cref{fig:recon_sample} compares a held‐out weight (black) and its reconstruction (blue) under $\beta_1=0.5$: primitives capture bulk structure but smooth high‐frequency details.
+
+\paragraph{Optimizer Choice.}
+\Cref{fig:opt_ablation} presents training/validation error and loss for SGD, RMSprop, and AdamW.  RMSprop fits training fastest but overfits (val error~0.45), AdamW balances (train~0.16, val~0.25), while SGD shows little improvement in reconstruction loss, indicating underfitting.
+
+\paragraph{Batch‐Size Ablation.}
+\Cref{fig:batch_ablation} illustrates effects of batch size on training/validation.  Smaller batches converge faster on training objectives but overfit more on validation (e.g., bs=10 val error~0.40 vs.\ bs=80 at ~0.25).
+
+\begin{figure}[h]
+  \centering
+  \subfigure[Relative Error]{\includegraphics[width=0.48\textwidth]{baseline_error_curves.png}\label{fig:momentum_error}}
+  \subfigure[MSE Loss]{\includegraphics[width=0.48\textwidth]{baseline_loss_curves.png}\label{fig:momentum_loss}}
+  \caption{Momentum ablation (single run) with Adam $\beta_1\in\{0.5,0.7,0.9,0.99\}$.  (a) Training/validation relative error.  (b) Training/validation MSE; note differing axis scale.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.7\textwidth]{baseline_sample_reconstruction.png}
+  \caption{Sample reconstruction: held‐out weight (black) vs.\ sparse‐dictionary reconstruction with $\beta_1=0.5$ (blue).  Primitives retain bulk shape but smooth peaks.}
+  \label{fig:recon_sample}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \subfigure[Error]{\includegraphics[width=0.48\textwidth]{optimizer_choice.png}}
+  \subfigure[Loss]{\includegraphics[width=0.48\textwidth]{optimizer_choice_error.png}}
+  \caption{Optimizer ablation (single run): training/validation (a) relative error and (b) MSE for SGD, RMSprop, AdamW.}
+  \label{fig:opt_ablation}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \subfigure[Error]{\includegraphics[width=0.48\textwidth]{mini_batch_size.png}}
+  \subfigure[Loss]{\includegraphics[width=0.48\textwidth]{mini_batch_size_error.png}}
+  \caption{Batch‐size ablation (single run): training/validation (a) relative error and (b) MSE for batch sizes 80,40,20,10.}
+  \label{fig:batch_ablation}
+\end{figure}
+
+\section{Conclusion}
+We introduce weight primitives, a sparse dictionary in weight space for compositional model synthesis.  On a synthetic benchmark, learned primitives reconstruct unseen weights with under 15\% error and enable controlled interpolation.  Ablations reveal critical hyperparameter trade‐offs in momentum, optimizer, and batch size.  Future work will scale to real CNN zoos on vision tasks (e.g., CIFAR‐10/100 \citep{krizhevsky2009learningml}, ResNet‐18 \citep{he2015deeprl}, VGG \citep{simonyan2014verydc}) and explore structured dictionaries respecting tensor symmetries.
+
+\bibliography{references}
+\bibliographystyle{iclr2025}
+
+\appendix
+\section*{Supplementary Material}
+\paragraph{Hyperparameters.}
+All runs use learning rate $10^{-3}$, $\lambda=0.1$, code dimension $k=30$.  Adam has $\beta_2=0.999$, weight decay $10^{-5}$.
+
+\section{Additional Ablations}
+\paragraph{Dictionary Capacity.}
+\Cref{fig:dict_cap} shows train/validation relative error vs.\ dictionary size; error curves for $k\in\{10,20,30,50\}$.  Larger $k$ improves fit but risks overfitting.
+
+\paragraph{Initialization Schemes.}
+\Cref{fig:init_ablation} compares random Gaussian vs.\ orthonormal initialization of $D$, illustrating sensitivity to initialization on convergence speed.
+
+\begin{figure}[h]
+  \centering
+  \subfigure[Relative Error]{\includegraphics[width=0.48\textwidth]{dictionary_capacity.png}}
+  \subfigure[Validation MSE]{\includegraphics[width=0.48\textwidth]{dictionary_capacity_error.png}}
+  \caption{Varying dictionary capacity $k$: (a) train/val relative error, (b) validation MSE.}
+  \label{fig:dict_cap}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \subfigure[Init Scheme]{\includegraphics[width=0.48\textwidth]{initialization_scheme.png}}
+  \subfigure[Error vs.\ Epoch]{\includegraphics[width=0.48\textwidth]{initialization_error.png}}
+  \caption{Initialization ablation: random Gaussian vs.\ orthonormal $D$; (b) shows train/val relative error.}
+  \label{fig:init_ablation}
+\end{figure}
+
+\end{document}

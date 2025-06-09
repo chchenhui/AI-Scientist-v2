@@ -1,0 +1,73 @@
+
+% P. W. Koh & P. Liang (ICML 2017) introduce influence functions to trace a model’s predictions back to training examples via gradient and Hessian-vector approximations, providing a classic influence-based method for estimating per-sample contributions; cite in Related Work when contrasting our scalable DVN against traditional influence-function approaches.
+@article{koh2017understandingbp,
+ author = {Pang Wei Koh and Percy Liang},
+ booktitle = {International Conference on Machine Learning},
+ pages = {1885-1894},
+ title = {Understanding Black-box Predictions via Influence Functions},
+ year = {2017}
+}
+
+% Data Shapley (Ghorbani & Zou, NeurIPS 2019) introduces Shapley-value based data valuation with Monte Carlo and gradient-based estimators in supervised learning; cite in Related Work to contrast with our meta-learned sampler that amortizes valuation cost and scales to foundation-model pre-training.
+@article{ghorbani2019datase,
+ author = {Amirata Ghorbani and James Y. Zou},
+ booktitle = {International Conference on Machine Learning},
+ journal = {ArXiv},
+ title = {Data Shapley: Equitable Valuation of Data for Machine Learning},
+ volume = {abs/1904.02868},
+ year = {2019}
+}
+
+% GLISTER: Generalization based Data Subset Selection for Efficient and Robust Learning (Killamsetty et al., AAAI 2020) formulates training subset selection as mixed discrete-continuous bi-level optimization to maximize held-out validation likelihood and proposes iterative online and active learning variants; cite in Related Work when comparing held-out loss–based coreset methods against our scalable, amortized DVN sampler.
+@article{killamsetty2020glistergb,
+ author = {Krishnateja Killamsetty and D. Sivasubramanian and Ganesh Ramakrishnan and Rishabh Iyer University of Texas at Dallas and Indian Institute of Technology Bombay Institution One and IN Two},
+ booktitle = {AAAI Conference on Artificial Intelligence},
+ pages = {8110-8118},
+ title = {GLISTER: Generalization based Data Subset Selection for Efficient and Robust Learning},
+ year = {2020}
+}
+
+% Radford et al. (2019) introduce GPT-2, the transformer-based language model trained on the WebText corpus. Cite in the Experiments section to reference the model architecture and pre-training dataset used as our foundation model.
+@inproceedings{radford2019languagema,
+ author = {Alec Radford and Jeff Wu and R. Child and D. Luan and Dario Amodei and I. Sutskever},
+ title = {Language Models are Unsupervised Multitask Learners},
+ year = {2019}
+}
+
+% Mengye Ren et al. (ICML 2018) introduce a meta-learning algorithm that learns to assign weights to training examples via meta-gradient descent to optimize performance on a clean validation set; cite in Related Work when contrasting our DVN’s learned valuation network with existing meta-learning–based sample reweighting approaches.
+@article{ren2018learningtr,
+ author = {Mengye Ren and Wenyuan Zeng and Binh Yang and R. Urtasun},
+ booktitle = {International Conference on Machine Learning},
+ pages = {4331-4340},
+ title = {Learning to Reweight Examples for Robust Deep Learning},
+ year = {2018}
+}
+
+% Denis Paperno et al. (ACL 2016) introduce the LAMBADA dataset for word prediction requiring broad discourse context. Cite in Experiments when describing the zero-shot evaluation on LAMBADA to reference the benchmark’s origin and motivation.
+@article{paperno2016theld,
+ author = {Denis Paperno and Germán Kruszewski and Angeliki Lazaridou and Q. N. Pham and R. Bernardi and Sandro Pezzelle and Marco Baroni and Gemma Boleda and R. Fernández},
+ booktitle = {Annual Meeting of the Association for Computational Linguistics},
+ journal = {ArXiv},
+ title = {The LAMBADA dataset: Word prediction requiring a broad discourse context},
+ volume = {abs/1606.06031},
+ year = {2016}
+}
+
+% Moritz Hardt et al. (NeurIPS 2016) introduce the equality of opportunity fairness criterion and a post-processing method to enforce it. Cite this work in the Fairness Metrics and Related Work sections when defining subgroup disparity measures (e.g., perplexity differences between toxic vs. non-toxic text) and motivating our fairness-focused sampling adjustments.
+@article{hardt2016equalityoo,
+ author = {Moritz Hardt and Eric Price and N. Srebro},
+ booktitle = {Neural Information Processing Systems},
+ journal = {ArXiv},
+ title = {Equality of Opportunity in Supervised Learning},
+ volume = {abs/1610.02413},
+ year = {2016}
+}
+
+% Yonatan Bisk et al. (AAAI 2019) introduce the PIQA benchmark for physical commonsense reasoning in language; cite in Experiments when reporting zero-shot accuracy on PIQA.
+@article{bisk2019piqara,
+ author = {Yonatan Bisk and Rowan Zellers and Ronan Le Bras and Jianfeng Gao and Yejin Choi},
+ booktitle = {AAAI Conference on Artificial Intelligence},
+ pages = {7432-7439},
+ title = {PIQA: Reasoning about Physical Commonsense in Natural Language},
+ year = {2019}
+}

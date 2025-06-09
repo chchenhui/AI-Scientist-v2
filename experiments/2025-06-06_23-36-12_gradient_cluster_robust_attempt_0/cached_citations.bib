@@ -1,0 +1,73 @@
+
+% Cite Sagawa et al. (2020) “Distributionally Robust Neural Networks” (ICLR 2020) as the foundational Group DRO method, which minimizes worst-group training loss with group labels and highlights the role of regularization. Reference this work in the Related Work section when describing Group DRO and as the baseline robust training framework used in our method.
+@article{sagawa2020distributionallyrn,
+ author = {Shiori Sagawa and Pang Wei Koh and Tatsunori B. Hashimoto and Percy Liang},
+ booktitle = {International Conference on Learning Representations},
+ title = {Distributionally Robust Neural Networks},
+ year = {2020}
+}
+
+% Liu et al. (ICML 2021) “Just Train Twice: Improving Group Robustness without Training Group Information” proposes a two-stage ERM-based method that upweights high-loss examples to boost worst-group accuracy without group labels; cite this in the Related Work section when discussing heuristic group reweighting and include as a baseline in experiments.
+@article{liu2021justtt,
+ author = {E. Liu and Behzad Haghgoo and Annie S. Chen and Aditi Raghunathan and Pang Wei Koh and Shiori Sagawa and Percy Liang and Chelsea Finn},
+ booktitle = {International Conference on Machine Learning},
+ journal = {ArXiv},
+ title = {Just Train Twice: Improving Group Robustness without Training Group Information},
+ volume = {abs/2107.09044},
+ year = {2021}
+}
+
+% Arjovsky et al. (2019) Invariant Risk Minimization: Introduces the IRM framework and the Colored MNIST benchmark for studying spurious correlations and invariant representation learning. Cite in Related Work when summarizing spurious-correlation benchmarks and domain generalization baselines.
+@article{arjovsky2019invariantrm,
+ author = {Martín Arjovsky and L. Bottou and Ishaan Gulrajani and David Lopez-Paz},
+ booktitle = {arXiv.org},
+ journal = {ArXiv},
+ title = {Invariant Risk Minimization},
+ volume = {abs/1907.02893},
+ year = {2019}
+}
+
+% Kaiming He et al. (2015) Deep Residual Learning for Image Recognition: Introduces the ResNet architecture including ResNet-50 with residual skip connections. Cite in the Experiments section when describing the ResNet-50 backbone used for Waterbirds and CelebA.
+@article{he2015deeprl,
+ author = {Kaiming He and X. Zhang and Shaoqing Ren and Jian Sun},
+ booktitle = {Computer Vision and Pattern Recognition},
+ journal = {2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+ pages = {770-778},
+ title = {Deep Residual Learning for Image Recognition},
+ year = {2015}
+}
+
+% Liu et al. (2014) “Deep Learning Face Attributes in the Wild” introduces the CelebA dataset and two-CNN framework for face attribute prediction. Cite this in the Experiments section when describing the CelebA hair classification dataset.
+@article{liu2014deeplf,
+ author = {Ziwei Liu and Ping Luo and Xiaogang Wang and Xiaoou Tang},
+ booktitle = {IEEE International Conference on Computer Vision},
+ journal = {2015 IEEE International Conference on Computer Vision (ICCV)},
+ pages = {3730-3738},
+ title = {Deep Learning Face Attributes in the Wild},
+ year = {2014}
+}
+
+% Ren et al. (2018) introduce a meta-learning algorithm that learns to assign example weights based on gradient directions to mitigate training biases and label noise using a small clean validation set. Cite this work in the Related Work section when discussing loss-based sample reweighting baselines.
+@article{ren2018learningtr,
+ author = {Mengye Ren and Wenyuan Zeng and Binh Yang and R. Urtasun},
+ booktitle = {International Conference on Machine Learning},
+ pages = {4331-4340},
+ title = {Learning to Reweight Examples for Robust Deep Learning},
+ year = {2018}
+}
+
+% Koh & Liang (ICML 2017) introduce influence functions, a method for tracing a model's prediction back to individual training points using gradients and Hessian-vector products. We cite this work in the Related Work and theoretical justification sections to motivate our use of per-sample gradient statistics for capturing feature-correlation strengths.
+@article{koh2017understandingbp,
+ author = {Pang Wei Koh and Percy Liang},
+ booktitle = {International Conference on Machine Learning},
+ pages = {1885-1894},
+ title = {Understanding Black-box Predictions via Influence Functions},
+ year = {2017}
+}
+
+% C. Wah et al. (2011) introduce the Caltech-UCSD Birds-200-2011 (CUB-200-2011) dataset, a fine-grained bird classification benchmark that serves as the core imagery source for constructing the Waterbirds spurious-correlation dataset. Cite in the Experiments section when describing the Waterbirds data setup.
+@inproceedings{wah2011thecb,
+ author = {C. Wah and Steve Branson and P. Welinder and P. Perona and Serge J. Belongie},
+ title = {The Caltech-UCSD Birds-200-2011 Dataset},
+ year = {2011}
+}

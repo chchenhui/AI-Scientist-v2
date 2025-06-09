@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Check if we're running under Live Server
+      if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+          let lastModified = '';
+
+          // Check for file changes every second
+          setInterval(async () => {
+              try {
+                  const response = await fetch(window.location.href, { method: 'HEAD' });
+                  // get a timestamp that shows when the file was last changed
+                  const currentModified = response.headers.get('last-modified');
+
+                  if (lastModified && lastModified !== currentModified) {
+                      window.location.reload();
+                  }
+
+                  lastModified = currentModified;
+              } catch (e) {
+                  console.error('Error checking for updates:', e);
+              }
+          }, 1000);
+      }
+  </script>
+    <script
+      id="p5scripttag"
+      src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"
+      integrity="sha512-uaz5GpnQoE6t5echKlX8P52czvsIGgLPcvlzfvRubLZ1Hp8JemUDnbUiAahbVtPb+jUVrNETuXvAhDDF/N3M4w=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+
+    <script>
+      const bgCol = "#FFFFFF";
+const accentCol = "#1a439e";
+
+hljs.initHighlightingOnLoad();
+
+// Function to update background color globally
+function updateBackgroundColor(color) {
+  // Update the JS variable
+  window.bgColCurrent = color;
+
+  // Update body background
+  document.body.style.backgroundColor = color;
+
+  // Update canvas container background
+  const canvasContainer = document.getElementById('canvas-container');
+  if (canvasContainer) {
+    canvasContainer.style.backgroundColor = color;
+  }
+}
+
+// Store tree data for each stage
+const stageData = {
+  Stage_1: null,
+  Stage_2: null,
+  Stage_3: null,
+  Stage_4: null
+};
+
+// Keep track of current selected stage
+let currentStage = null;
+let currentSketch = null;
+let availableStages = [];
+
+// Class definitions for nodes and edges
+class Node {
+  constructor(x, y, id, isRoot = false) {
+    this.x = x;
+    this.y = y;
+    this.id = id;
+    this.visible = isRoot; // Only root nodes are visible initially
+    this.appearProgress = 0;
+    this.popEffect = 0;
+    this.selected = false;
+    this.isRootNode = isRoot;
+  }
+
+  update() {
+    if (this.visible) {
+      // Handle the main appearance animation
+      if (this.appearProgress < 1) {
+        this.appearProgress += 0.06;
+
+        // When we reach full size, trigger the pop effect
+        if (this.appearProgress >= 1) {
+          this.appearProgress = 1; // Cap at 1
+          this.popEffect = 1; // Start the pop effect
+        }
+      }
+
+      // Handle the pop effect animation
+      if (this.popEffect > 0) {
+        this.popEffect -= 0.15; // Control how quickly it shrinks back
+        if (this.popEffect < 0) this.popEffect = 0; // Don't go negative
+      }
+    }
+  }
+
+  startAnimation() {
+    this.visible = true;
+  }
+
+  color() {
+    if (this.selected) {
+      return accentCol; // Use the global accent color variable for selected node
+    }
+    return '#4263eb'; // Default blue color
+  }
+
+  render(p5) {
+    if (this.visible) {
+      const popBonus = this.popEffect * 0.1;
+      const nodeScale = p5.map(this.appearProgress, 0, 1, 0, 1) + popBonus;
+      const alpha = p5.map(this.appearProgress, 0, 1, 0, 255);
+
+      p5.push();
+      p5.translate(this.x, this.y);
+
+      // Shadow effect
+      p5.noStroke();
+      p5.rectMode(p5.CENTER);
+
+      for (let i = 1; i <= 4; i++) {
+        p5.fill(0, 0, 0, alpha * 0.06);
+        p5.rect(i, i, 30 * nodeScale, 30 * nodeScale, 10);
+      }
+
+      // Main square - use node's color with alpha
+      let nodeColor = p5.color(this.color());
+      nodeColor.setAlpha(alpha);
+      p5.fill(nodeColor);
+      p5.rect(0, 0, 30 * nodeScale, 30 * nodeScale, 10);
+
+      // Draw checkmark icon if the node is selected
+      if (this.selected && this.appearProgress >= 1) {
+        p5.stroke(255);
+        p5.strokeWeight(2 * nodeScale);
+        p5.noFill();
+        // Draw checkmark
+        p5.beginShape();
+        p5.vertex(-8, 0);
+        p5.vertex(-3, 5);
+        p5.vertex(8, -6);
+        p5.endShape();
+      }
+
+      p5.pop();
+    }
+  }
+
+  isMouseOver(p5) {
+    return this.visible &&
+           p5.mouseX > this.x - 15 &&
+           p5.mouseX < this.x + 15 &&
+           p5.mouseY > this.y - 15 &&
+           p5.mouseY < this.y + 15;
+  }
+
+  // Connect this node to a child node
+  child(childNode) {
+    // Create an edge from this node to the child
+    let isLeft = childNode.x < this.x;
+    let isRight = childNode.x > this.x;
+    let edge = new Edge(this, childNode, isLeft, isRight);
+    return edge;
+  }
+}
+
+class Edge {
+  constructor(parent, child, isLeft, isRight) {
+    this.parent = parent;
+    this.child = child;
+    this.isLeft = isLeft;
+    this.isRight = isRight;
+    this.progress = 0;
+
+    // Calculate the midpoint where branching occurs
+    this.midY = parent.y + (child.y - parent.y) * 0.6;
+
+    // Use the actual child x-coordinate
+    // This ensures the edge will connect directly to the child node
+    this.branchX = child.x;
+  }
+
+  update() {
+    if (this.parent.visible && this.progress < 1) {
+      this.progress += 0.01; // Adjust animation speed
+    }
+    if (this.progress >= 1) {
+      this.child.visible = true;
+    }
+  }
+
+  color() {
+    return this.child.color();
+  }
+
+  render(p5) {
+    if (!this.parent.visible) return;
+
+    // Calculate path lengths
+    const verticalDist1 = this.midY - this.parent.y;
+    const horizontalDist = Math.abs(this.branchX - this.parent.x);
+    const verticalDist2 = this.child.y - this.midY;
+    const totalLength = verticalDist1 + horizontalDist + verticalDist2;
+
+    // Calculate how much of each segment to draw
+    const currentLength = totalLength * this.progress;
+
+    p5.stroke(180, 190, 205);
+    p5.strokeWeight(1.5);
+    p5.noFill();
+
+    // Always draw the first vertical segment from parent
+    if (currentLength > 0) {
+      const firstSegmentLength = Math.min(currentLength, verticalDist1);
+      const currentMidY = p5.lerp(this.parent.y, this.midY, firstSegmentLength / verticalDist1);
+      p5.line(this.parent.x, this.parent.y, this.parent.x, currentMidY);
+    }
+
+    if (currentLength > verticalDist1) {
+      // Draw second segment (horizontal)
+      const secondSegmentLength = Math.min(currentLength - verticalDist1, horizontalDist);
+      const currentBranchX = p5.lerp(this.parent.x, this.branchX, secondSegmentLength / horizontalDist);
+      p5.line(this.parent.x, this.midY, currentBranchX, this.midY);
+
+      if (currentLength > verticalDist1 + horizontalDist) {
+        // Draw third segment (vertical to child)
+        const thirdSegmentLength = currentLength - verticalDist1 - horizontalDist;
+        const currentChildY = p5.lerp(this.midY, this.child.y, thirdSegmentLength / verticalDist2);
+        p5.line(this.branchX, this.midY, this.branchX, currentChildY);
+      }
+    }
+  }
+}
+
+// Create a modified sketch for each stage
+function createTreeSketch(stageId) {
+  return function(p5) {
+    let nodes = [];
+    let edges = [];
+    let treeData = stageData[stageId];
+
+    p5.setup = function() {
+      const canvas = p5.createCanvas(p5.windowWidth * 0.4, p5.windowHeight);
+      canvas.parent('canvas-container');
+      p5.smooth();
+      p5.frameRate(60);
+
+      if (treeData) {
+        createTreeFromData(treeData);
+      }
+    };
+
+    p5.windowResized = function() {
+      p5.resizeCanvas(p5.windowWidth * 0.4, p5.windowHeight);
+    };
+
+    function createTreeFromData(data) {
+      // Clear existing nodes and edges
+      nodes = [];
+      edges = [];
+
+      // Add defensive checks to prevent errors
+      if (!data || !data.layout || !Array.isArray(data.layout) || !data.edges || !Array.isArray(data.edges)) {
+        console.error("Invalid tree data format:", data);
+        return; // Exit if data structure is invalid
+      }
+
+      // Find all parent nodes in edges
+      const parentNodes = new Set();
+      for (const [parentId, childId] of data.edges) {
+        parentNodes.add(parentId);
+      }
+
+      // Create nodes
+      for (let i = 0; i < data.layout.length; i++) {
+        const [nx, ny] = data.layout[i];
+        // A node is a root if it's a parent and not a child in any edge
+        const isRoot = parentNodes.has(i) && data.edges.every(edge => edge[1] !== i);
+
+        const node = new Node(
+          nx * p5.width * 0.8 + p5.width * 0.1,
+          ny * p5.height * 0.8 + p5.height * 0.1,
+          i,
+          isRoot
+        );
+        nodes.push(node);
+      }
+
+      // If no root was found, make the first parent node visible
+      if (!nodes.some(node => node.visible) && parentNodes.size > 0) {
+        // Get the first parent node
+        const firstParentId = [...parentNodes][0];
+        if (nodes[firstParentId]) {
+          nodes[firstParentId].visible = true;
+        }
+      }
+
+      // Create edges
+      for (const [parentId, childId] of data.edges) {
+        const parent = nodes[parentId];
+        const child = nodes[childId];
+        if (parent && child) { // Verify both nodes exist
+          const isLeft = child.x < parent.x;
+          const isRight = child.x > parent.x;
+          edges.push(new Edge(parent, child, isLeft, isRight));
+        }
+      }
+
+      // Select the first node by default
+      if (nodes.length > 0) {
+        nodes[0].selected = true;
+        updateNodeInfo(0);
+      }
+    }
+
+    p5.draw = function() {
+      // Use the global background color if available, otherwise use the default bgCol
+      const currentBgColor = window.bgColCurrent || bgCol;
+      p5.background(currentBgColor);
+
+      // Update and render edges
+      for (const edge of edges) {
+        edge.update();
+        edge.render(p5);
+      }
+
+      // Update and render nodes
+      for (const node of nodes) {
+        node.update();
+        node.render(p5);
+      }
+
+      // Handle mouse hover
+      p5.cursor(p5.ARROW);
+      for (const node of nodes) {
+        if (node.isMouseOver(p5)) {
+          p5.cursor(p5.HAND);
+        }
+      }
+    };
+
+    p5.mousePressed = function() {
+      // Check if any node was clicked
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].visible && nodes[i].isMouseOver(p5)) {
+          // Deselect all nodes
+          nodes.forEach(n => n.selected = false);
+          // Select the clicked node
+          nodes[i].selected = true;
+          // Update the right panel with node info
+          updateNodeInfo(i);
+          break;
+        }
+      }
+    };
+
+    function updateNodeInfo(nodeIndex) {
+      if (treeData) {
+        setNodeInfo(
+          treeData.code[nodeIndex],
+          treeData.plan[nodeIndex],
+          treeData.plot_code?.[nodeIndex],
+          treeData.plot_plan?.[nodeIndex],
+          treeData.metrics?.[nodeIndex],
+          treeData.exc_type?.[nodeIndex] || '',
+          treeData.exc_info?.[nodeIndex]?.args?.[0] || '',
+          treeData.exc_stack?.[nodeIndex] || [],
+          treeData.plots?.[nodeIndex] || [],
+          treeData.plot_analyses?.[nodeIndex] || [],
+          treeData.vlm_feedback_summary?.[nodeIndex] || '',
+          treeData.datasets_successfully_tested?.[nodeIndex] || [],
+          treeData.exec_time_feedback?.[nodeIndex] || '',
+          treeData.exec_time?.[nodeIndex] || ''
+        );
+      }
+    }
+  };
+}
+
+// Start a new p5 sketch for the given stage
+function startSketch(stageId) {
+  if (currentSketch) {
+    currentSketch.remove();
+  }
+
+  if (stageData[stageId]) {
+    currentSketch = new p5(createTreeSketch(stageId));
+
+    // Update stage info
+    const stageNumber = stageId.split('_')[1];
+    let stageDesc = '';
+    switch(stageId) {
+      case 'Stage_1': stageDesc = 'Preliminary Investigation'; break;
+      case 'Stage_2': stageDesc = 'Baseline Tuning'; break;
+      case 'Stage_3': stageDesc = 'Research Agenda Execution'; break;
+      case 'Stage_4': stageDesc = 'Ablation Studies'; break;
+    }
+
+    document.getElementById('stage-info').innerHTML =
+      `<strong>Current Stage: ${stageNumber} - ${stageDesc}</strong>`;
+  }
+}
+
+// Handle tab selection
+function selectStage(stageId) {
+  if (!stageData[stageId] || !availableStages.includes(stageId)) {
+    return; // Don't allow selection of unavailable stages
+  }
+
+  // Update active tab styles
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.classList.remove('active');
+  });
+  document.querySelector(`.tab[data-stage="${stageId}"]`).classList.add('active');
+
+  // Start the new sketch
+  currentStage = stageId;
+  startSketch(stageId);
+}
+
+// Function to load the tree data for all stages
+async function loadAllStageData(baseTreeData) {
+  console.log("Loading stage data with base data:", baseTreeData);
+
+  // The base tree data is for the current stage
+  const currentStageId = baseTreeData.current_stage || 'Stage_1';
+
+  // Ensure base tree data is valid and has required properties
+  if (baseTreeData && baseTreeData.layout && baseTreeData.edges) {
+    stageData[currentStageId] = baseTreeData;
+    availableStages.push(currentStageId);
+    console.log(`Added current stage ${currentStageId} to available stages`);
+  } else {
+    console.warn(`Current stage ${currentStageId} data is invalid:`, baseTreeData);
+  }
+
+  // Use relative path to load other stage trees
+  const logDirPath = baseTreeData.log_dir_path || '.';
+  console.log("Log directory path:", logDirPath);
+
+  // Load data for each stage if available
+  const stageNames = ['Stage_1', 'Stage_2', 'Stage_3', 'Stage_4'];
+  const stageNames2actualNames = {
+    'Stage_1': 'stage_1_initial_implementation_1_preliminary',
+    'Stage_2': 'stage_2_baseline_tuning_1_first_attempt',
+    'Stage_3': 'stage_3_creative_research_1_first_attempt',
+    'Stage_4': 'stage_4_ablation_studies_1_first_attempt'
+    }
+
+  for (const stage of stageNames) {
+
+    if (baseTreeData.completed_stages && baseTreeData.completed_stages.includes(stage)) {
+      try {
+        console.log(`Attempting to load data for ${stage} from ${logDirPath}/${stageNames2actualNames[stage]}/tree_data.json`);
+        const response = await fetch(`${logDirPath}/${stageNames2actualNames[stage]}/tree_data.json`);
+
+        if (response.ok) {
+          const data = await response.json();
+
+          // Validate the loaded data
+          if (data && data.layout && data.edges) {
+            stageData[stage] = data;
+            availableStages.push(stage);
+            console.log(`Successfully loaded and validated data for ${stage}`);
+          } else {
+            console.warn(`Loaded data for ${stage} is invalid:`, data);
+          }
+        } else {
+          console.warn(`Failed to load data for ${stage} - HTTP status ${response.status}`);
+        }
+      } catch (error) {
+        console.error(`Error loading data for ${stage}:`, error);
+      }
+    } else {
+      console.log(`Skipping stage ${stage} - not in completed stages list:`, baseTreeData.completed_stages);
+    }
+  }
+
+  // Update tab visibility based on available stages
+  updateTabVisibility();
+
+  // Start with the first available stage
+  if (availableStages.length > 0) {
+    selectStage(availableStages[0]);
+  } else {
+    console.warn("No stages available to display");
+    // Display a message in the canvas area
+    document.getElementById('canvas-container').innerHTML =
+      '<div style="padding: 20px; color: #333; text-align: center;"><h3>No valid tree data available to display</h3></div>';
+  }
+}
+
+// Update tab visibility based on available stages
+function updateTabVisibility() {
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(tab => {
+    const stageId = tab.getAttribute('data-stage');
+    if (availableStages.includes(stageId)) {
+      tab.classList.remove('disabled');
+    } else {
+      tab.classList.add('disabled');
+    }
+  });
+}
+
+// Utility function to set the node info in the right panel
+const setNodeInfo = (code, plan, plot_code, plot_plan, metrics = null, exc_type = '', exc_info = '',
+    exc_stack = [], plots = [], plot_analyses = [], vlm_feedback_summary = '',
+    datasets_successfully_tested = [], exec_time_feedback = '', exec_time = '') => {
+  const codeElm = document.getElementById("code");
+  if (codeElm) {
+    if (code) {
+      codeElm.innerHTML = hljs.highlight(code, { language: "python" }).value;
+    } else {
+      codeElm.innerHTML = '<p>No code available</p>';
+    }
+  }
+
+  const planElm = document.getElementById("plan");
+  if (planElm) {
+    if (plan) {
+      planElm.innerHTML = hljs.highlight(plan, { language: "plaintext" }).value;
+    } else {
+      planElm.innerHTML = '<p>No plan available</p>';
+    }
+  }
+
+  const plot_codeElm = document.getElementById("plot_code");
+  if (plot_codeElm) {
+    if (plot_code) {
+      plot_codeElm.innerHTML = hljs.highlight(plot_code, { language: "python" }).value;
+    } else {
+      plot_codeElm.innerHTML = '<p>No plot code available</p>';
+    }
+  }
+
+  const plot_planElm = document.getElementById("plot_plan");
+  if (plot_planElm) {
+    if (plot_plan) {
+      plot_planElm.innerHTML = hljs.highlight(plot_plan, { language: "plaintext" }).value;
+    } else {
+      plot_planElm.innerHTML = '<p>No plot plan available</p>';
+    }
+  }
+
+  const metricsElm = document.getElementById("metrics");
+  if (metricsElm) {
+      let metricsContent = `<h3>Metrics:</h3>`;
+      if (metrics && metrics.metric_names) {
+          for (const metric of metrics.metric_names) {
+              metricsContent += `<div class="metric-group">`;
+              metricsContent += `<h4>${metric.metric_name}</h4>`;
+              metricsContent += `<p><strong>Description:</strong> ${metric.description || 'N/A'}</p>`;
+              metricsContent += `<p><strong>Optimization:</strong> ${metric.lower_is_better ? 'Minimize' : 'Maximize'}</p>`;
+
+              // Create table for dataset values
+              metricsContent += `<table class="metric-table">
+                  <tr>
+                      <th>Dataset</th>
+                      <th>Final Value</th>
+                      <th>Best Value</th>
+                  </tr>`;
+
+              for (const dataPoint of metric.data) {
+                  metricsContent += `<tr>
+                      <td>${dataPoint.dataset_name}</td>
+                      <td>${dataPoint.final_value?.toFixed(4) || 'N/A'}</td>
+                      <td>${dataPoint.best_value?.toFixed(4) || 'N/A'}</td>
+                  </tr>`;
+              }
+
+              metricsContent += `</table></div>`;
+          }
+      } else if (metrics === null) {
+          metricsContent += `<p>No metrics available</p>`;
+      }
+      metricsElm.innerHTML = metricsContent;
+  }
+
+  // Add plots display
+  const plotsElm = document.getElementById("plots");
+  if (plotsElm) {
+      if (plots && plots.length > 0) {
+          let plotsContent = '';
+          plots.forEach(plotPath => {
+              plotsContent += `
+                  <div class="plot-item">
+                      <img src="${plotPath}" alt="Experiment Plot" onerror="console.error('Failed to load plot:', this.src)"/>
+                  </div>`;
+          });
+          plotsElm.innerHTML = plotsContent;
+      } else {
+          plotsElm.innerHTML = '';
+      }
+  }
+
+  // Add error info display
+  const errorElm = document.getElementById("exc_info");
+  if (errorElm) {
+    if (exc_type) {
+      let errorContent = `<h3 style="color: #ff5555">Exception Information:</h3>
+                          <p><strong>Type:</strong> ${exc_type}</p>`;
+
+      if (exc_info) {
+        errorContent += `<p><strong>Details:</strong> <pre>${JSON.stringify(exc_info, null, 2)}</pre></p>`;
+      }
+
+      if (exc_stack) {
+        errorContent += `<p><strong>Stack Trace:</strong> <pre>${exc_stack.join('\n')}</pre></p>`;
+      }
+
+      errorElm.innerHTML = errorContent;
+    } else {
+      errorElm.innerHTML = "No exception info available";
+    }
+  }
+
+  const exec_timeElm = document.getElementById("exec_time");
+  if (exec_timeElm) {
+    let exec_timeContent = '<div id="exec_time"><h3>Execution Time (in seconds):</h3><p>' + exec_time + '</p></div>';
+    exec_timeElm.innerHTML = exec_timeContent;
+  }
+
+  const exec_time_feedbackElm = document.getElementById("exec_time_feedback");
+  if (exec_time_feedbackElm) {
+    let exec_time_feedbackContent = '<div id="exec_time_feedback_content">'
+    exec_time_feedbackContent += '<h3>Execution Time Feedback:</h3>'
+    exec_time_feedbackContent += '<p>' + exec_time_feedback + '</p>'
+    exec_time_feedbackContent += '</div>';
+    exec_time_feedbackElm.innerHTML = exec_time_feedbackContent;
+  }
+
+  const vlm_feedbackElm = document.getElementById("vlm_feedback");
+  if (vlm_feedbackElm) {
+      let vlm_feedbackContent = '';
+
+      if (plot_analyses && plot_analyses.length > 0) {
+          vlm_feedbackContent += `<h3>Plot Analysis:</h3>`;
+          plot_analyses.forEach(analysis => {
+              if (analysis && analysis.plot_path) {  // Add null check
+                  vlm_feedbackContent += `
+                      <div class="plot-analysis">
+                          <h4>Analysis for ${analysis.plot_path.split('/').pop()}</h4>
+                          <p>${analysis.analysis || 'No analysis available'}</p>
+                          <ul class="key-findings">
+                              ${(analysis.key_findings || []).map(finding => `<li>${finding}</li>`).join('')}
+                          </ul>
+                      </div>`;
+              } else {
+                  console.warn('Received invalid plot analysis:', analysis);
+                  vlm_feedbackContent += `
+                      <div class="plot-analysis">
+                          <p>Invalid plot analysis data received</p>
+                      </div>`;
+              }
+          });
+      }
+
+      // Add actionable insights if available
+      if (vlm_feedback_summary && typeof vlm_feedback_summary === 'string') {
+          vlm_feedbackContent += `
+              <div class="vlm_feedback">
+                  <h3>VLM Feedback Summary:</h3>
+                  <p>${vlm_feedback_summary}</p>
+              </div>`;
+      }
+
+      console.log("Datasets successfully tested:", datasets_successfully_tested);
+      if (datasets_successfully_tested && datasets_successfully_tested.length > 0) {
+          vlm_feedbackContent += `
+              <div id="datasets_successfully_tested">
+                  <h3>Datasets Successfully Tested:</h3>
+                  <p>${datasets_successfully_tested.join(', ')}</p>
+              </div>`;
+      }
+
+      if (!vlm_feedbackContent) {
+          vlm_feedbackContent = '<p>No insights available for this experiment.</p>';
+      }
+
+      vlm_feedbackElm.innerHTML = vlm_feedbackContent;
+  }
+
+  const datasets_successfully_testedElm = document.getElementById("datasets_successfully_tested");
+  if (datasets_successfully_testedElm) {
+      let datasets_successfully_testedContent = '';
+      if (datasets_successfully_tested && datasets_successfully_tested.length > 0) {
+          datasets_successfully_testedContent = `<h3>Datasets Successfully Tested:</h3><ul>`;
+          datasets_successfully_tested.forEach(dataset => {
+              datasets_successfully_testedContent += `<li>${dataset}</li>`;
+          });
+          datasets_successfully_testedContent += `</ul>`;
+      } else {
+          datasets_successfully_testedContent = '<p>No datasets tested yet</p>';
+      }
+      datasets_successfully_testedElm.innerHTML = datasets_successfully_testedContent;
+  }
+};
+
+// Initialize with the provided tree data
+const treeStructData = {"edges": [[1, 3], [2, 5], [4, 9], [4, 7], [4, 6], [4, 8]], "layout": [[0.0, 0.0], [0.16666666666666666, 0.0], [0.3333333333333333, 0.0], [0.16666666666666666, 1.0], [0.75, 0.0], [0.3333333333333333, 1.0], [0.5, 1.0], [0.6666666666666666, 1.0], [0.8333333333333334, 1.0], [1.0, 1.0]], "plan": ["We will train a small convolutional network on MNIST multiple times and snapshot\nits weights after each epoch to form a collection of flattened weight vectors.\nUsing sklearn\u2019s MiniBatchDictionaryLearning, we will learn a dictionary of\nshared weight primitives via online updates. We then hold out a fresh model\u2019s\nweights, flatten them, and at each dictionary learning iteration compute sparse\ncodes, reconstruct both train and held-out weights, and measure the relative\nweight reconstruction error. We treat the held-out reconstruction error as the\nvalidation loss and print it each epoch. We store per\u2010epoch training and\nvalidation reconstruction errors in a nested experiment_data dict under a\n\u201cMNIST\u201d key. After all dictionary epochs, we save experiment_data to disk in the\nworking directory. This establishes a basic end\u2010to\u2010end pipeline from data\npreparation to model training to weight\u2010dictionary learning and evaluation.", "We simulate a small \u201cmodel zoo\u201d of synthetic weight vectors to mimic trained\nneural networks, splitting them into training and validation subsets. We\nparametrize both a dictionary D and sparse codes C as PyTorch parameters, then\noptimize a combined MSE reconstruction loss plus an L1 sparsity penalty on the\ncodes via Adam. During each epoch we compute both train and validation\nreconstruction losses, print the validation loss as required, and calculate the\nRelative Weight Reconstruction Error metric. We record per-epoch train/val\nlosses and errors in an `experiment_data` dict, and at the end save the\nreconstructed weights and original ground truth weights for further analysis.\nFinally, we dump the entire `experiment_data` dictionary to\n`working/experiment_data.npy` for downstream inspection. This simple baseline\nestablishes the full pipeline from data preparation through dictionary learning\nand evaluation, ready for extension to a real model zoo.", "First, we define a small CNN and train two \u201cteacher\u201d models for one epoch on\nMNIST so that we can extract their convolutional filters. We then build a weight\ndataset per layer (\u201cconv1\u201d and \u201cconv2\u201d) by taking each filter vector from both\nteacher nets and synthesizing noisy variants, splitting into train/validation.\nFor each layer we instantiate a MiniBatchDictionaryLearning model and call\npartial_fit iteratively for 10 epochs, computing and printing the relative\nreconstruction error on the validation set at each epoch and storing these\nmetrics. After learning layer\u2010wise dictionaries, we instantiate a new CNN and\nreconstruct its conv filters by sparse coding with the learned primitives,\nupdating its weights accordingly. We then evaluate this reconstructed network on\nMNIST test data to obtain classification accuracy and compute an overall\nrelative weight reconstruction error by comparing the reconstructed conv weights\nto those of the first teacher net. All computation is done on GPU if available,\nand inputs are normalized to zero\u2010mean unit\u2010variance for MNIST. Finally, we\nrecord all metrics, losses, test predictions, and ground\u2010truth labels in a\nstructured dictionary and save it via np.save in the working directory.", "We need to ensure that C and D are created as leaf tensors so the optimizer can\nupdate them. By wrapping them in nn.Parameter with requires_grad=True, they\nbecome proper learnable parameters. We initialize them on the device and only\nthen construct the optimizer. All other logic remains unchanged to track\nreconstruction loss and relative error per epoch.", "We generate a synthetic \u201cmodel zoo\u201d by drawing sparse combinations of a small\nground\u2010truth set of weight primitives to form a collection of weight vectors. We\nsplit these vectors into train and test sets, and parametrize both the\ndictionary and train\u2010codes as PyTorch Parameters on GPU. We jointly optimize the\ndictionary and train\u2010codes with an L2 reconstruction loss plus an L1 sparsity\npenalty on the codes. Each epoch we compute the relative reconstruction error on\nboth train and test sets, printing the test error as our \u201cvalidation_loss.\u201d We\nrecord per\u2010epoch losses and errors into a nested experiment_data dict. At the\nend we save all the recorded metrics and losses into a \u2018experiment_data.npy\u2019\nfile under the working directory. This simple baseline establishes that our\noptimization pipeline and metric tracking work end\u2010to\u2010end on GPU in a few lines\nof code.", "We replace the sklearn dictionary\u2010learning with a lightweight PyTorch K-means\nstyle algorithm that alternates between assigning each flattened weight sample\nto its nearest dictionary atom (via torch.cdist) and updating atoms to the mean\nof their assigned samples.  We train separate conv1/conv2 dictionaries over\nmultiple epochs, tracking per-layer train/val reconstruction errors and a global\nrelative weight reconstruction error across layers each epoch.  After learning,\nwe reconstruct a fresh CNN by mapping each filter to its nearest atom, evaluate\nits test accuracy and final weight reconstruction error, and save all metrics in\nexperiment_data.npy under working_dir.  This removes the external sklearn\ndependency and fully runs in PyTorch.", "Seed node", "Seed node", "Seed node", "Aggregate results from multiple seeds"], "code": ["import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nfrom torch.utils.data import DataLoader\nfrom torchvision import datasets, transforms\nfrom sklearn.decomposition import MiniBatchDictionaryLearning\n\n# GPU/CPU setup\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# MNIST data\ntransform = transforms.Compose(\n    [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]\n)\ntrain_dataset = datasets.MNIST(\n    root=working_dir, train=True, download=True, transform=transform\n)\ntrain_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)\n\n\n# Simple CNN model\nclass SimpleCNN(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.conv1 = nn.Conv2d(1, 10, 5)\n        self.conv2 = nn.Conv2d(10, 20, 5)\n        self.fc1 = nn.Linear(20 * 4 * 4, 50)\n        self.fc2 = nn.Linear(50, 10)\n\n    def forward(self, x):\n        x = F.relu(F.max_pool2d(self.conv1(x), 2))\n        x = F.relu(F.max_pool2d(self.conv2(x), 2))\n        x = x.view(-1, 20 * 4 * 4)\n        x = F.relu(self.fc1(x))\n        return F.log_softmax(self.fc2(x), dim=1)\n\n\n# Utility to flatten model weights to a numpy vector\ndef flatten_weights(model):\n    return torch.cat([p.detach().cpu().view(-1) for p in model.parameters()]).numpy()\n\n\n# Train several models and snapshot weights\nnum_models = 3\nepochs_train = 2\nweight_snapshots = []\nfor _ in range(num_models):\n    model = SimpleCNN().to(device)\n    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)\n    # snapshot initial\n    weight_snapshots.append(flatten_weights(model))\n    for _ in range(epochs_train):\n        model.train()\n        for data, target in train_loader:\n            data, target = data.to(device), target.to(device)\n            out = model(data)\n            loss = F.nll_loss(out, target)\n            optimizer.zero_grad()\n            loss.backward()\n            optimizer.step()\n        weight_snapshots.append(flatten_weights(model))\n\n# Prepare training data for dictionary learning\ntrain_data = np.stack(weight_snapshots)\n\n# Prepare a held-out model for validation\nval_model = SimpleCNN().to(device)\nval_opt = torch.optim.SGD(val_model.parameters(), lr=0.01)\nfor _ in range(epochs_train):\n    val_model.train()\n    for data, target in train_loader:\n        data, target = data.to(device), target.to(device)\n        out = val_model(data)\n        l = F.nll_loss(out, target)\n        val_opt.zero_grad()\n        l.backward()\n        val_opt.step()\nval_data = flatten_weights(val_model)[None, :]\n\n# Dictionary learning setup\ndict_learner = MiniBatchDictionaryLearning(\n    n_components=5, alpha=1, batch_size=train_data.shape[0], n_iter=1\n)\nepochs_dict = 10\n\n# Experiment data structure\nexperiment_data = {\n    \"MNIST\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n# Online dictionary learning with per-epoch evaluation\nfor epoch in range(1, epochs_dict + 1):\n    dict_learner.partial_fit(train_data)\n    # training reconstruction\n    codes_tr = dict_learner.transform(train_data)\n    recon_tr = np.dot(codes_tr, dict_learner.components_)\n    errs_tr = np.linalg.norm(train_data - recon_tr, axis=1) / np.linalg.norm(\n        train_data, axis=1\n    )\n    error_train = errs_tr.mean()\n    # validation reconstruction\n    codes_val = dict_learner.transform(val_data)\n    recon_val = np.dot(codes_val, dict_learner.components_)\n    errs_val = np.linalg.norm(val_data - recon_val, axis=1) / np.linalg.norm(\n        val_data, axis=1\n    )\n    error_val = errs_val.mean()\n    print(f\"Epoch {epoch}: validation_loss = {error_val:.4f}\")\n    experiment_data[\"MNIST\"][\"metrics\"][\"train\"].append(error_train)\n    experiment_data[\"MNIST\"][\"metrics\"][\"val\"].append(error_val)\n    experiment_data[\"MNIST\"][\"losses\"][\"train\"].append(error_train)\n    experiment_data[\"MNIST\"][\"losses\"][\"val\"].append(error_val)\n\n# Save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "import os\nimport torch\nimport torch.nn as nn\nimport numpy as np\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Simulate a model zoo of synthetic weight vectors\nn_models = 20\ndim = 1000\nn_train = 15\nn_val = n_models - n_train\ntorch.manual_seed(0)\nweight_data = torch.randn(n_models, dim, device=device)\n\n# Dictionary learning hyperparameters\nK = 50\nepochs = 100\nlr = 1e-2\nlambda1 = 1e-3\n\n# Initialize sparse codes and dictionary\nC = torch.randn(n_models, K, device=device, requires_grad=True) * 0.1\nD = torch.randn(K, dim, device=device, requires_grad=True) * 0.1\n\nmse_loss_fn = nn.MSELoss()\noptimizer = torch.optim.Adam([C, D], lr=lr)\n\n# Prepare experiment data structure\nexperiment_data = {\n    \"synthetic_weight_dataset\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n# Training loop for dictionary learning\nfor epoch in range(1, epochs + 1):\n    optimizer.zero_grad()\n    recon = torch.matmul(C, D)\n    recon_train = recon[:n_train]\n    data_train = weight_data[:n_train]\n    recon_val = recon[n_train:]\n    data_val = weight_data[n_train:]\n\n    # Reconstruction loss + L1 penalty on codes\n    train_loss = (\n        mse_loss_fn(recon_train, data_train)\n        + lambda1 * torch.norm(C[:n_train], p=1) / n_train\n    )\n    train_loss.backward()\n    optimizer.step()\n\n    with torch.no_grad():\n        train_loss_val = mse_loss_fn(recon_train, data_train)\n        val_loss = mse_loss_fn(recon_val, data_val)\n        train_error = torch.mean(\n            torch.norm(data_train - recon_train, dim=1) / torch.norm(data_train, dim=1)\n        ).item()\n        val_error = torch.mean(\n            torch.norm(data_val - recon_val, dim=1) / torch.norm(data_val, dim=1)\n        ).item()\n\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n\n    experiment_data[\"synthetic_weight_dataset\"][\"metrics\"][\"train\"].append(train_error)\n    experiment_data[\"synthetic_weight_dataset\"][\"metrics\"][\"val\"].append(val_error)\n    experiment_data[\"synthetic_weight_dataset\"][\"losses\"][\"train\"].append(\n        train_loss_val.item()\n    )\n    experiment_data[\"synthetic_weight_dataset\"][\"losses\"][\"val\"].append(val_loss.item())\n\n# Save final reconstructions and ground truth\nwith torch.no_grad():\n    recon_full = torch.matmul(C, D)\nexperiment_data[\"synthetic_weight_dataset\"][\"predictions\"] = recon_full.cpu().numpy()\nexperiment_data[\"synthetic_weight_dataset\"][\"ground_truth\"] = weight_data.cpu().numpy()\n\n# Dump experiment data to file\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport random\nimport numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport torch.optim as optim\nfrom torch.utils.data import DataLoader\nimport torchvision\nimport torchvision.transforms as transforms\nfrom sklearn.decomposition import MiniBatchDictionaryLearning\n\n# reproducibility\nseed = 0\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# MNIST data\ntransform = transforms.Compose(\n    [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]\n)\ntrain_ds = torchvision.datasets.MNIST(\n    root=\"./data\", train=True, download=True, transform=transform\n)\ntest_ds = torchvision.datasets.MNIST(\n    root=\"./data\", train=False, download=True, transform=transform\n)\ntrain_loader = DataLoader(train_ds, batch_size=64, shuffle=True)\ntest_loader = DataLoader(test_ds, batch_size=1000, shuffle=False)\n\n\n# simple CNN\nclass SimpleCNN(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.conv1 = nn.Conv2d(1, 16, 3, 1)\n        self.conv2 = nn.Conv2d(16, 32, 3, 1)\n        self.fc1 = nn.Linear(32 * 5 * 5, 128)\n        self.fc2 = nn.Linear(128, 10)\n\n    def forward(self, x):\n        x = F.relu(self.conv1(x))\n        x = F.max_pool2d(x, 2)\n        x = F.relu(self.conv2(x))\n        x = F.max_pool2d(x, 2)\n        x = x.view(x.size(0), -1)\n        x = F.relu(self.fc1(x))\n        return self.fc2(x)\n\n\n# train a model for one epoch\ndef train_model(model, train_loader, test_loader, epochs):\n    model.to(device)\n    opt = optim.Adam(model.parameters(), lr=1e-3)\n    crit = nn.CrossEntropyLoss()\n    for epoch in range(1, epochs + 1):\n        model.train()\n        for data, tgt in train_loader:\n            data, tgt = data.to(device), tgt.to(device)\n            opt.zero_grad()\n            out = model(data)\n            loss = crit(out, tgt)\n            loss.backward()\n            opt.step()\n        model.eval()\n        val_loss = 0.0\n        with torch.no_grad():\n            for data, tgt in test_loader:\n                data, tgt = data.to(device), tgt.to(device)\n                val_loss += crit(model(data), tgt).item() * data.size(0)\n        val_loss /= len(test_loader.dataset)\n        print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n    return model\n\n\n# obtain two teacher nets\nteacher_models = []\nfor _ in range(2):\n    net = SimpleCNN()\n    net = train_model(net, train_loader, test_loader, epochs=1)\n    teacher_models.append(net)\n\n\n# build weight datasets per conv layer\ndef build_layer_dataset(nets, layer, variations=50, noise_std=0.01):\n    samples = []\n    for m in nets:\n        w = getattr(m, layer).weight.detach().cpu().numpy()\n        out_ch, in_ch, kh, kw = w.shape\n        vec_len = in_ch * kh * kw\n        for filt in w:\n            base = filt.reshape(-1)\n            for _ in range(variations):\n                samples.append(base + np.random.randn(vec_len) * noise_std)\n    data = np.stack(samples)\n    perm = np.random.permutation(len(data))\n    data = data[perm]\n    split = int(0.8 * len(data))\n    return data[:split], data[split:]\n\n\ntrain_c1, val_c1 = build_layer_dataset(teacher_models, \"conv1\")\ntrain_c2, val_c2 = build_layer_dataset(teacher_models, \"conv2\")\n\n# dictionary learning per layer\ndict_configs = {\n    \"conv1\": {\"train\": train_c1, \"val\": val_c1, \"n_components\": 10},\n    \"conv2\": {\"train\": train_c2, \"val\": val_c2, \"n_components\": 20},\n}\nexperiment_data = {}\nfor layer, cfg in dict_configs.items():\n    experiment_data[layer] = {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n    D = MiniBatchDictionaryLearning(\n        n_components=cfg[\"n_components\"], alpha=1, batch_size=100, n_iter=1\n    )\n    for epoch in range(1, 11):\n        D.partial_fit(cfg[\"train\"])\n        # train error\n        code_tr = D.transform(cfg[\"train\"])\n        rec_tr = code_tr.dot(D.components_)\n        err_tr = np.linalg.norm(cfg[\"train\"] - rec_tr, axis=1) / np.linalg.norm(\n            cfg[\"train\"], axis=1\n        )\n        tr_err = err_tr.mean()\n        # val error\n        code_v = D.transform(cfg[\"val\"])\n        rec_v = code_v.dot(D.components_)\n        err_v = np.linalg.norm(cfg[\"val\"] - rec_v, axis=1) / np.linalg.norm(\n            cfg[\"val\"], axis=1\n        )\n        v_err = err_v.mean()\n        experiment_data[layer][\"metrics\"][\"train\"].append(tr_err)\n        experiment_data[layer][\"metrics\"][\"val\"].append(v_err)\n        experiment_data[layer][\"losses\"][\"train\"].append(tr_err)\n        experiment_data[layer][\"losses\"][\"val\"].append(v_err)\n        print(f\"Layer {layer} Epoch {epoch}: validation_loss = {v_err:.4f}\")\n    dict_configs[layer][\"model\"] = D\n\n# reconstruct a fresh CNN\nrecon_model = SimpleCNN().to(device)\nwith torch.no_grad():\n    for layer in [\"conv1\", \"conv2\"]:\n        D = dict_configs[layer][\"model\"]\n        w = getattr(recon_model, layer).weight.data.cpu().numpy()\n        out_ch, in_ch, kh, kw = w.shape\n        flats = w.reshape(out_ch, -1)\n        codes = D.transform(flats)\n        rec = codes.dot(D.components_).reshape(out_ch, in_ch, kh, kw)\n        getattr(recon_model, layer).weight.data = torch.from_numpy(rec).to(device)\n\n# evaluate reconstructed model\nrecon_model.eval()\ncorrect = 0\nall_preds, all_tgts = [], []\nwith torch.no_grad():\n    for data, tgt in test_loader:\n        data, tgt = data.to(device), tgt.to(device)\n        out = recon_model(data)\n        preds = out.argmax(dim=1)\n        correct += preds.eq(tgt).sum().item()\n        all_preds.append(preds.cpu().numpy())\n        all_tgts.append(tgt.cpu().numpy())\ntest_acc = correct / len(test_loader.dataset)\n\n# compute overall relative reconstruction error vs first teacher\nrel_list = []\nfor layer in [\"conv1\", \"conv2\"]:\n    orig = getattr(teacher_models[0], layer).weight.detach().cpu().numpy()\n    recw = getattr(recon_model, layer).weight.detach().cpu().numpy()\n    rel_list.append(np.linalg.norm(orig - recw) / np.linalg.norm(orig))\noverall_rel_err = np.mean(rel_list)\n\n# record final metrics\nexperiment_data[\"reconstructed_model\"] = {\n    \"metrics\": {\"test_acc\": [test_acc]},\n    \"losses\": {\"relative_reconstruction_error\": [overall_rel_err]},\n    \"predictions\": np.concatenate(all_preds),\n    \"ground_truth\": np.concatenate(all_tgts),\n}\n\n# save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n\nprint(f\"Reconstructed model test accuracy: {test_acc:.4f}\")\nprint(f\"Overall relative weight reconstruction error: {overall_rel_err:.4f}\")\n", "import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport torch\nimport torch.nn as nn\nimport numpy as np\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Simulate a model zoo of synthetic weight vectors\nn_models = 20\ndim = 1000\nn_train = 15\nn_val = n_models - n_train\ntorch.manual_seed(0)\nweight_data = torch.randn(n_models, dim, device=device)\n\n# Dictionary learning hyperparameters\nK = 50\nepochs = 100\nlr = 1e-2\nlambda1 = 1e-3\n\n# Initialize sparse codes and dictionary as leaf parameters\nC = nn.Parameter(torch.randn(n_models, K, device=device) * 0.1)\nD = nn.Parameter(torch.randn(K, dim, device=device) * 0.1)\n\nmse_loss_fn = nn.MSELoss()\noptimizer = torch.optim.Adam([C, D], lr=lr)\n\n# Prepare experiment data structure\nexperiment_data = {\n    \"synthetic_weight_dataset\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n# Training loop for dictionary learning\nfor epoch in range(1, epochs + 1):\n    optimizer.zero_grad()\n    recon = torch.matmul(C, D)\n    recon_train, data_train = recon[:n_train], weight_data[:n_train]\n    recon_val, data_val = recon[n_train:], weight_data[n_train:]\n\n    # Reconstruction loss + L1 penalty on codes\n    train_loss = (\n        mse_loss_fn(recon_train, data_train)\n        + lambda1 * torch.norm(C[:n_train], p=1) / n_train\n    )\n    train_loss.backward()\n    optimizer.step()\n\n    with torch.no_grad():\n        train_loss_val = mse_loss_fn(recon_train, data_train)\n        val_loss = mse_loss_fn(recon_val, data_val)\n        train_error = torch.mean(\n            torch.norm(data_train - recon_train, dim=1) / torch.norm(data_train, dim=1)\n        ).item()\n        val_error = torch.mean(\n            torch.norm(data_val - recon_val, dim=1) / torch.norm(data_val, dim=1)\n        ).item()\n\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n\n    experiment_data[\"synthetic_weight_dataset\"][\"metrics\"][\"train\"].append(train_error)\n    experiment_data[\"synthetic_weight_dataset\"][\"metrics\"][\"val\"].append(val_error)\n    experiment_data[\"synthetic_weight_dataset\"][\"losses\"][\"train\"].append(\n        train_loss_val.item()\n    )\n    experiment_data[\"synthetic_weight_dataset\"][\"losses\"][\"val\"].append(val_loss.item())\n\n# Save final reconstructions and ground truth\nwith torch.no_grad():\n    recon_full = torch.matmul(C, D)\nexperiment_data[\"synthetic_weight_dataset\"][\"predictions\"] = recon_full.cpu().numpy()\nexperiment_data[\"synthetic_weight_dataset\"][\"ground_truth\"] = weight_data.cpu().numpy()\n\n# Dump experiment data to file\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport torch\nimport torch.nn as nn\nimport numpy as np\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Synthetic weight dataset\nn_samples = 80\nn_test = 20\nn_components = 30\ndim = 1024\nlambda1 = 1e-2\nlr = 1e-2\nepochs = 50\n\n# ground truth primitives and codes\ntorch.manual_seed(0)\nD0 = torch.randn(n_components, dim, device=device)\ncodes0 = (\n    torch.rand(n_samples + n_test, n_components, device=device) < 0.1\n).float() * torch.randn(n_samples + n_test, n_components, device=device)\nW_all = codes0.mm(D0) + 0.01 * torch.randn(n_samples + n_test, dim, device=device)\n\n# train/test split\nW_train = W_all[:n_samples]\nW_test = W_all[n_samples:]\n\n# learnable params\nD = nn.Parameter(torch.randn_like(D0))\ncodes_train = nn.Parameter(torch.randn(n_samples, n_components, device=device))\n\noptimizer = torch.optim.Adam([D, codes_train], lr=lr)\n\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\nfor epoch in range(1, epochs + 1):\n    optimizer.zero_grad()\n    W_hat_train = codes_train.mm(D)\n    loss_recon = ((W_hat_train - W_train) ** 2).mean()\n    loss_sparse = lambda1 * codes_train.abs().mean()\n    loss = loss_recon + loss_sparse\n    loss.backward()\n    optimizer.step()\n\n    # compute train error\n    with torch.no_grad():\n        train_err = (\n            ((W_hat_train - W_train).norm(dim=1) / W_train.norm(dim=1)).mean().item()\n        )\n        # test codes via pinv\n        D_pinv = torch.pinverse(D)\n        codes_test = W_test.mm(D_pinv)\n        W_hat_test = codes_test.mm(D)\n        val_err = ((W_hat_test - W_test).norm(dim=1) / W_test.norm(dim=1)).mean().item()\n\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_err)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_err)\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(loss_recon.item())\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(\n        ((W_hat_test - W_test) ** 2).mean().item()\n    )\n\n    print(f\"Epoch {epoch}: validation_loss = {val_err:.4f}\")\n\n# save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport random\nimport numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\nimport torch.optim as optim\nfrom torch.utils.data import DataLoader\nimport torchvision\nimport torchvision.transforms as transforms\n\n# device setup\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# reproducibility\nseed = 0\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\n# MNIST data\ntransform = transforms.Compose(\n    [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]\n)\ntrain_ds = torchvision.datasets.MNIST(\n    root=\"./data\", train=True, download=True, transform=transform\n)\ntest_ds = torchvision.datasets.MNIST(\n    root=\"./data\", train=False, download=True, transform=transform\n)\ntrain_loader = DataLoader(train_ds, batch_size=64, shuffle=True)\ntest_loader = DataLoader(test_ds, batch_size=1000, shuffle=False)\n\n\n# simple CNN\nclass SimpleCNN(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.conv1 = nn.Conv2d(1, 16, 3, 1)\n        self.conv2 = nn.Conv2d(16, 32, 3, 1)\n        self.fc1 = nn.Linear(32 * 5 * 5, 128)\n        self.fc2 = nn.Linear(128, 10)\n\n    def forward(self, x):\n        x = F.relu(self.conv1(x))\n        x = F.max_pool2d(x, 2)\n        x = F.relu(self.conv2(x))\n        x = F.max_pool2d(x, 2)\n        x = x.view(x.size(0), -1)\n        x = F.relu(self.fc1(x))\n        return self.fc2(x)\n\n\n# train a model for one epoch\ndef train_model(model, train_loader, test_loader, epochs):\n    model.to(device)\n    opt = optim.Adam(model.parameters(), lr=1e-3)\n    crit = nn.CrossEntropyLoss()\n    for epoch in range(1, epochs + 1):\n        model.train()\n        for data, tgt in train_loader:\n            data, tgt = data.to(device), tgt.to(device)\n            opt.zero_grad()\n            loss = crit(model(data), tgt)\n            loss.backward()\n            opt.step()\n        model.eval()\n        val_loss = 0.0\n        with torch.no_grad():\n            for data, tgt in test_loader:\n                data, tgt = data.to(device), tgt.to(device)\n                val_loss += crit(model(data), tgt).item() * data.size(0)\n        val_loss /= len(test_loader.dataset)\n        print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n    return model\n\n\n# obtain two teacher nets\nteacher_models = []\nfor _ in range(2):\n    net = SimpleCNN()\n    net = train_model(net, train_loader, test_loader, epochs=1)\n    teacher_models.append(net)\n\n\n# build weight datasets per conv layer\ndef build_layer_dataset(nets, layer, variations=50, noise_std=0.01):\n    samples = []\n    for m in nets:\n        w = getattr(m, layer).weight.detach().cpu().numpy()\n        out_ch, in_ch, kh, kw = w.shape\n        vec_len = in_ch * kh * kw\n        for filt in w:\n            base = filt.reshape(-1)\n            for _ in range(variations):\n                samples.append(base + np.random.randn(vec_len) * noise_std)\n    data = np.stack(samples)\n    perm = np.random.permutation(len(data))\n    data = data[perm]\n    split = int(0.8 * len(data))\n    return data[:split], data[split:]\n\n\ntrain_c1, val_c1 = build_layer_dataset(teacher_models, \"conv1\")\ntrain_c2, val_c2 = build_layer_dataset(teacher_models, \"conv2\")\n# convert to torch tensors on device\ntrain_c1_t = torch.from_numpy(train_c1).float().to(device)\nval_c1_t = torch.from_numpy(val_c1).float().to(device)\ntrain_c2_t = torch.from_numpy(train_c2).float().to(device)\nval_c2_t = torch.from_numpy(val_c2).float().to(device)\n\n\n# PyTorch K-means style dictionary learning\ndef kmeans_epoch(D, data, batch_size):\n    N = data.size(0)\n    perm = torch.randperm(N)\n    for i in range(0, N, batch_size):\n        batch = data[perm[i : i + batch_size]]\n        if batch.numel() == 0:\n            continue\n        dists = torch.cdist(batch, D, p=2)\n        assign = torch.argmin(dists, dim=1)\n        for j in range(D.size(0)):\n            mask = assign == j\n            if mask.sum() > 0:\n                D[j] = batch[mask].mean(dim=0)\n    return D\n\n\ndef compute_layer_error(D, data):\n    dists = torch.cdist(data, D, p=2)\n    assign = torch.argmin(dists, dim=1)\n    rec = D[assign]\n    errs = torch.norm(data - rec, dim=1) / (torch.norm(data, dim=1) + 1e-8)\n    return errs.mean().item()\n\n\n# config and storage\ndict_configs = {\n    \"conv1\": {\"train\": train_c1_t, \"val\": val_c1_t, \"n_components\": 10},\n    \"conv2\": {\"train\": train_c2_t, \"val\": val_c2_t, \"n_components\": 20},\n}\nexperiment_data = {\n    \"conv1\": {\"metrics\": {\"train\": [], \"val\": []}, \"losses\": {\"train\": [], \"val\": []}},\n    \"conv2\": {\"metrics\": {\"train\": [], \"val\": []}, \"losses\": {\"train\": [], \"val\": []}},\n    \"global\": {\"relative_weight_rec_error\": []},\n}\n\n# initialize dictionaries\nfor layer, cfg in dict_configs.items():\n    N = cfg[\"train\"].size(0)\n    perm = torch.randperm(N)\n    D_init = cfg[\"train\"][perm[: cfg[\"n_components\"]]].clone()\n    cfg[\"D\"] = D_init\n\n# train dictionaries\nn_epochs = 10\nbatch_size = 100\nfor epoch in range(1, n_epochs + 1):\n    for layer, cfg in dict_configs.items():\n        D = kmeans_epoch(cfg[\"D\"], cfg[\"train\"], batch_size)\n        cfg[\"D\"] = D\n        tr_err = compute_layer_error(D, cfg[\"train\"])\n        v_err = compute_layer_error(D, cfg[\"val\"])\n        experiment_data[layer][\"metrics\"][\"train\"].append(tr_err)\n        experiment_data[layer][\"metrics\"][\"val\"].append(v_err)\n        experiment_data[layer][\"losses\"][\"train\"].append(tr_err)\n        experiment_data[layer][\"losses\"][\"val\"].append(v_err)\n        print(f\"Layer {layer} Epoch {epoch}: validation_loss = {v_err:.4f}\")\n    # global relative weight reconstruction error\n    rels = []\n    for layer, cfg in dict_configs.items():\n        D = cfg[\"D\"]\n        w = getattr(teacher_models[0], layer).weight.data\n        out_ch, in_ch, kh, kw = w.shape\n        flats = w.view(out_ch, -1)\n        dists = torch.cdist(flats, D, p=2)\n        assign = torch.argmin(dists, dim=1)\n        rec = D[assign]\n        errs = torch.norm(flats - rec, dim=1) / (torch.norm(flats, dim=1) + 1e-8)\n        rels.append(errs.mean().item())\n    global_rel = sum(rels) / len(rels)\n    experiment_data[\"global\"][\"relative_weight_rec_error\"].append(global_rel)\n    print(\n        f\"Epoch {epoch}: global relative weight reconstruction error = {global_rel:.4f}\"\n    )\n\n# reconstruct a fresh CNN\nrecon_model = SimpleCNN().to(device)\nwith torch.no_grad():\n    for layer, cfg in dict_configs.items():\n        D = cfg[\"D\"]\n        w = getattr(recon_model, layer).weight.data\n        out_ch, in_ch, kh, kw = w.shape\n        flats = w.view(out_ch, -1)\n        dists = torch.cdist(flats, D, p=2)\n        assign = torch.argmin(dists, dim=1)\n        rec = D[assign].view(out_ch, in_ch, kh, kw)\n        getattr(recon_model, layer).weight.data.copy_(rec)\n\n# evaluate reconstructed model\nrecon_model.eval()\ncorrect = 0\nall_preds, all_tgts = [], []\nwith torch.no_grad():\n    for data, tgt in test_loader:\n        data, tgt = data.to(device), tgt.to(device)\n        out = recon_model(data)\n        preds = out.argmax(dim=1)\n        correct += preds.eq(tgt).sum().item()\n        all_preds.append(preds.cpu().numpy())\n        all_tgts.append(tgt.cpu().numpy())\ntest_acc = correct / len(test_loader.dataset)\n\n# compute overall relative reconstruction error vs first teacher\nrels_final = []\nfor layer in [\"conv1\", \"conv2\"]:\n    orig = getattr(teacher_models[0], layer).weight.data\n    recw = getattr(recon_model, layer).weight.data\n    fo = orig.view(orig.size(0), -1)\n    fr = recw.view(recw.size(0), -1)\n    errs = torch.norm(fo - fr, dim=1) / (torch.norm(fo, dim=1) + 1e-8)\n    rels_final.append(errs.mean().item())\noverall_rel_err = sum(rels_final) / len(rels_final)\n\nexperiment_data[\"reconstructed_model\"] = {\n    \"metrics\": {\"test_acc\": [test_acc]},\n    \"losses\": {\"relative_reconstruction_error\": [overall_rel_err]},\n    \"predictions\": np.concatenate(all_preds),\n    \"ground_truth\": np.concatenate(all_tgts),\n}\n\n# save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n\nprint(f\"Reconstructed model test accuracy: {test_acc:.4f}\")\nprint(f\"Overall relative weight reconstruction error: {overall_rel_err:.4f}\")\n", "# Set random seed\nimport random\nimport numpy as np\nimport torch\n\nseed = 0\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport torch\nimport torch.nn as nn\nimport numpy as np\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Synthetic weight dataset\nn_samples = 80\nn_test = 20\nn_components = 30\ndim = 1024\nlambda1 = 1e-2\nlr = 1e-2\nepochs = 50\n\n# ground truth primitives and codes\ntorch.manual_seed(0)\nD0 = torch.randn(n_components, dim, device=device)\ncodes0 = (\n    torch.rand(n_samples + n_test, n_components, device=device) < 0.1\n).float() * torch.randn(n_samples + n_test, n_components, device=device)\nW_all = codes0.mm(D0) + 0.01 * torch.randn(n_samples + n_test, dim, device=device)\n\n# train/test split\nW_train = W_all[:n_samples]\nW_test = W_all[n_samples:]\n\n# learnable params\nD = nn.Parameter(torch.randn_like(D0))\ncodes_train = nn.Parameter(torch.randn(n_samples, n_components, device=device))\n\noptimizer = torch.optim.Adam([D, codes_train], lr=lr)\n\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\nfor epoch in range(1, epochs + 1):\n    optimizer.zero_grad()\n    W_hat_train = codes_train.mm(D)\n    loss_recon = ((W_hat_train - W_train) ** 2).mean()\n    loss_sparse = lambda1 * codes_train.abs().mean()\n    loss = loss_recon + loss_sparse\n    loss.backward()\n    optimizer.step()\n\n    # compute train error\n    with torch.no_grad():\n        train_err = (\n            ((W_hat_train - W_train).norm(dim=1) / W_train.norm(dim=1)).mean().item()\n        )\n        # test codes via pinv\n        D_pinv = torch.pinverse(D)\n        codes_test = W_test.mm(D_pinv)\n        W_hat_test = codes_test.mm(D)\n        val_err = ((W_hat_test - W_test).norm(dim=1) / W_test.norm(dim=1)).mean().item()\n\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_err)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_err)\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(loss_recon.item())\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(\n        ((W_hat_test - W_test) ** 2).mean().item()\n    )\n\n    print(f\"Epoch {epoch}: validation_loss = {val_err:.4f}\")\n\n# save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "# Set random seed\nimport random\nimport numpy as np\nimport torch\n\nseed = 1\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport torch\nimport torch.nn as nn\nimport numpy as np\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Synthetic weight dataset\nn_samples = 80\nn_test = 20\nn_components = 30\ndim = 1024\nlambda1 = 1e-2\nlr = 1e-2\nepochs = 50\n\n# ground truth primitives and codes\ntorch.manual_seed(0)\nD0 = torch.randn(n_components, dim, device=device)\ncodes0 = (\n    torch.rand(n_samples + n_test, n_components, device=device) < 0.1\n).float() * torch.randn(n_samples + n_test, n_components, device=device)\nW_all = codes0.mm(D0) + 0.01 * torch.randn(n_samples + n_test, dim, device=device)\n\n# train/test split\nW_train = W_all[:n_samples]\nW_test = W_all[n_samples:]\n\n# learnable params\nD = nn.Parameter(torch.randn_like(D0))\ncodes_train = nn.Parameter(torch.randn(n_samples, n_components, device=device))\n\noptimizer = torch.optim.Adam([D, codes_train], lr=lr)\n\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\nfor epoch in range(1, epochs + 1):\n    optimizer.zero_grad()\n    W_hat_train = codes_train.mm(D)\n    loss_recon = ((W_hat_train - W_train) ** 2).mean()\n    loss_sparse = lambda1 * codes_train.abs().mean()\n    loss = loss_recon + loss_sparse\n    loss.backward()\n    optimizer.step()\n\n    # compute train error\n    with torch.no_grad():\n        train_err = (\n            ((W_hat_train - W_train).norm(dim=1) / W_train.norm(dim=1)).mean().item()\n        )\n        # test codes via pinv\n        D_pinv = torch.pinverse(D)\n        codes_test = W_test.mm(D_pinv)\n        W_hat_test = codes_test.mm(D)\n        val_err = ((W_hat_test - W_test).norm(dim=1) / W_test.norm(dim=1)).mean().item()\n\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_err)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_err)\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(loss_recon.item())\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(\n        ((W_hat_test - W_test) ** 2).mean().item()\n    )\n\n    print(f\"Epoch {epoch}: validation_loss = {val_err:.4f}\")\n\n# save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "# Set random seed\nimport random\nimport numpy as np\nimport torch\n\nseed = 2\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport torch\nimport torch.nn as nn\nimport numpy as np\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Synthetic weight dataset\nn_samples = 80\nn_test = 20\nn_components = 30\ndim = 1024\nlambda1 = 1e-2\nlr = 1e-2\nepochs = 50\n\n# ground truth primitives and codes\ntorch.manual_seed(0)\nD0 = torch.randn(n_components, dim, device=device)\ncodes0 = (\n    torch.rand(n_samples + n_test, n_components, device=device) < 0.1\n).float() * torch.randn(n_samples + n_test, n_components, device=device)\nW_all = codes0.mm(D0) + 0.01 * torch.randn(n_samples + n_test, dim, device=device)\n\n# train/test split\nW_train = W_all[:n_samples]\nW_test = W_all[n_samples:]\n\n# learnable params\nD = nn.Parameter(torch.randn_like(D0))\ncodes_train = nn.Parameter(torch.randn(n_samples, n_components, device=device))\n\noptimizer = torch.optim.Adam([D, codes_train], lr=lr)\n\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\nfor epoch in range(1, epochs + 1):\n    optimizer.zero_grad()\n    W_hat_train = codes_train.mm(D)\n    loss_recon = ((W_hat_train - W_train) ** 2).mean()\n    loss_sparse = lambda1 * codes_train.abs().mean()\n    loss = loss_recon + loss_sparse\n    loss.backward()\n    optimizer.step()\n\n    # compute train error\n    with torch.no_grad():\n        train_err = (\n            ((W_hat_train - W_train).norm(dim=1) / W_train.norm(dim=1)).mean().item()\n        )\n        # test codes via pinv\n        D_pinv = torch.pinverse(D)\n        codes_test = W_test.mm(D_pinv)\n        W_hat_test = codes_test.mm(D)\n        val_err = ((W_hat_test - W_test).norm(dim=1) / W_test.norm(dim=1)).mean().item()\n\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_err)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_err)\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(loss_recon.item())\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(\n        ((W_hat_test - W_test) ** 2).mean().item()\n    )\n\n    print(f\"Epoch {epoch}: validation_loss = {val_err:.4f}\")\n\n# save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "# plotting aggregation code"], "term_out": ["['Traceback (most recent call last):\\n  File \"runfile.py\", line 12, in\n<module>\\n    from sklearn.decomposition import\nMiniBatchDictionaryLearning\\nModuleNotFoundError: No module named\n\\'sklearn\\'\\n', 'Execution time: a moment seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Traceback (most recent call last):\\n  File\n\"runfile.py\", line 31, in <module>\\n    optimizer = torch.optim.Adam([C, D],\nlr=lr)\\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File\n\"/home/chenhui/miniconda3/envs/ai_scientist/lib/python3.11/site-\npackages/torch/optim/adam.py\", line 78, in __init__\\n\nsuper().__init__(params, defaults)\\n  File\n\"/home/chenhui/miniconda3/envs/ai_scientist/lib/python3.11/site-\npackages/torch/optim/optimizer.py\", line 371, in __init__\\n\nself.add_param_group(cast(dict, param_group))\\n  File\n\"/home/chenhui/miniconda3/envs/ai_scientist/lib/python3.11/site-\npackages/torch/_compile.py\", line 32, in inner\\n    return disable_fn(*args,\n**kwargs)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File\n\"/home/chenhui/miniconda3/envs/ai_scientist/lib/python3.11/site-\npackages/torch/_dynamo/eval_frame.py\", line 632, in _fn\\n    return fn(*args,\n**kwargs)\\n           ^^^^^^^^^^^^^^^^^^^\\n  File\n\"/home/chenhui/miniconda3/envs/ai_scientist/lib/python3.11/site-\npackages/torch/optim/optimizer.py\", line 1026, in add_param_group\\n    raise\nValueError(\"can\\'t optimize a non-leaf Tensor\")\\nValueError: can\\'t optimize a\nnon-leaf Tensor\\n', 'Execution time: a second seconds (time limit is an hour).']", "['Traceback (most recent call last):\\n  File \"runfile.py\", line 15, in\n<module>\\n    from sklearn.decomposition import\nMiniBatchDictionaryLearning\\nModuleNotFoundError: No module named\n\\'sklearn\\'\\n', 'Execution time: a moment seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Epoch 1: validation_loss = 0.9876', '\\n', 'Epoch\n2: validation_loss = 0.9876', '\\n', 'Epoch 3: validation_loss = 0.9877', '\\n',\n'Epoch 4: validation_loss = 0.9878', '\\n', 'Epoch 5: validation_loss = 0.9881',\n'\\n', 'Epoch 6: validation_loss = 0.9885', '\\n', 'Epoch 7: validation_loss =\n0.9889', '\\n', 'Epoch 8: validation_loss = 0.9894', '\\n', 'Epoch 9:\nvalidation_loss = 0.9901', '\\n', 'Epoch 10: validation_loss = 0.9908', '\\n',\n'Epoch 11: validation_loss = 0.9916', '\\n', 'Epoch 12: validation_loss =\n0.9925', '\\n', 'Epoch 13: validation_loss = 0.9934', '\\n', 'Epoch 14:\nvalidation_loss = 0.9945', '\\n', 'Epoch 15: validation_loss = 0.9956', '\\n',\n'Epoch 16: validation_loss = 0.9967', '\\n', 'Epoch 17: validation_loss =\n0.9980', '\\n', 'Epoch 18: validation_loss = 0.9993', '\\n', 'Epoch 19:\nvalidation_loss = 1.0006', '\\n', 'Epoch 20: validation_loss = 1.0020', '\\n',\n'Epoch 21: validation_loss = 1.0033', '\\n', 'Epoch 22: validation_loss =\n1.0048', '\\n', 'Epoch 23: validation_loss = 1.0062', '\\n', 'Epoch 24:\nvalidation_loss = 1.0076', '\\n', 'Epoch 25: validation_loss = 1.0090', '\\n',\n'Epoch 26: validation_loss = 1.0104', '\\n', 'Epoch 27: validation_loss =\n1.0118', '\\n', 'Epoch 28: validation_loss = 1.0131', '\\n', 'Epoch 29:\nvalidation_loss = 1.0144', '\\n', 'Epoch 30: validation_loss = 1.0156', '\\n',\n'Epoch 31: validation_loss = 1.0167', '\\n', 'Epoch 32: validation_loss =\n1.0178', '\\n', 'Epoch 33: validation_loss = 1.0188', '\\n', 'Epoch 34:\nvalidation_loss = 1.0197', '\\n', 'Epoch 35: validation_loss = 1.0205', '\\n',\n'Epoch 36: validation_loss = 1.0212', '\\n', 'Epoch 37: validation_loss =\n1.0218', '\\n', 'Epoch 38: validation_loss = 1.0223', '\\n', 'Epoch 39:\nvalidation_loss = 1.0226', '\\n', 'Epoch 40: validation_loss = 1.0229', '\\n',\n'Epoch 41: validation_loss = 1.0231', '\\n', 'Epoch 42: validation_loss =\n1.0232', '\\n', 'Epoch 43: validation_loss = 1.0232', '\\n', 'Epoch 44:\nvalidation_loss = 1.0231', '\\n', 'Epoch 45: validation_loss = 1.0230', '\\n',\n'Epoch 46: validation_loss = 1.0228', '\\n', 'Epoch 47: validation_loss =\n1.0227', '\\n', 'Epoch 48: validation_loss = 1.0225', '\\n', 'Epoch 49:\nvalidation_loss = 1.0223', '\\n', 'Epoch 50: validation_loss = 1.0221', '\\n',\n'Epoch 51: validation_loss = 1.0220', '\\n', 'Epoch 52: validation_loss =\n1.0218', '\\n', 'Epoch 53: validation_loss = 1.0217', '\\n', 'Epoch 54:\nvalidation_loss = 1.0216', '\\n', 'Epoch 55: validation_loss = 1.0216', '\\n',\n'Epoch 56: validation_loss = 1.0216', '\\n', 'Epoch 57: validation_loss =\n1.0216', '\\n', 'Epoch 58: validation_loss = 1.0217', '\\n', 'Epoch 59:\nvalidation_loss = 1.0218', '\\n', 'Epoch 60: validation_loss = 1.0219', '\\n',\n'Epoch 61: validation_loss = 1.0220', '\\n', 'Epoch 62: validation_loss =\n1.0222', '\\n', 'Epoch 63: validation_loss = 1.0223', '\\n', 'Epoch 64:\nvalidation_loss = 1.0225', '\\n', 'Epoch 65: validation_loss = 1.0227', '\\n',\n'Epoch 66: validation_loss = 1.0229', '\\n', 'Epoch 67: validation_loss =\n1.0230', '\\n', 'Epoch 68: validation_loss = 1.0232', '\\n', 'Epoch 69:\nvalidation_loss = 1.0234', '\\n', 'Epoch 70: validation_loss = 1.0235', '\\n',\n'Epoch 71: validation_loss = 1.0237', '\\n', 'Epoch 72: validation_loss =\n1.0238', '\\n', 'Epoch 73: validation_loss = 1.0239', '\\n', 'Epoch 74:\nvalidation_loss = 1.0240', '\\n', 'Epoch 75: validation_loss = 1.0240', '\\n',\n'Epoch 76: validation_loss = 1.0241', '\\n', 'Epoch 77: validation_loss =\n1.0241', '\\n', 'Epoch 78: validation_loss = 1.0242', '\\n', 'Epoch 79:\nvalidation_loss = 1.0242', '\\n', 'Epoch 80: validation_loss = 1.0242', '\\n',\n'Epoch 81: validation_loss = 1.0243', '\\n', 'Epoch 82: validation_loss =\n1.0243', '\\n', 'Epoch 83: validation_loss = 1.0243', '\\n', 'Epoch 84:\nvalidation_loss = 1.0243', '\\n', 'Epoch 85: validation_loss = 1.0244', '\\n',\n'Epoch 86: validation_loss = 1.0244', '\\n', 'Epoch 87: validation_loss =\n1.0244', '\\n', 'Epoch 88: validation_loss = 1.0245', '\\n', 'Epoch 89:\nvalidation_loss = 1.0245', '\\n', 'Epoch 90: validation_loss = 1.0246', '\\n',\n'Epoch 91: validation_loss = 1.0246', '\\n', 'Epoch 92: validation_loss =\n1.0247', '\\n', 'Epoch 93: validation_loss = 1.0247', '\\n', 'Epoch 94:\nvalidation_loss = 1.0248', '\\n', 'Epoch 95: validation_loss = 1.0249', '\\n',\n'Epoch 96: validation_loss = 1.0249', '\\n', 'Epoch 97: validation_loss =\n1.0250', '\\n', 'Epoch 98: validation_loss = 1.0251', '\\n', 'Epoch 99:\nvalidation_loss = 1.0251', '\\n', 'Epoch 100: validation_loss = 1.0252', '\\n',\n'Execution time: a second seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Epoch 1: validation_loss = 0.9852', '\\n', 'Epoch\n2: validation_loss = 0.9852', '\\n', 'Epoch 3: validation_loss = 0.9852', '\\n',\n'Epoch 4: validation_loss = 0.9853', '\\n', 'Epoch 5: validation_loss = 0.9853',\n'\\n', 'Epoch 6: validation_loss = 0.9853', '\\n', 'Epoch 7: validation_loss =\n0.9853', '\\n', 'Epoch 8: validation_loss = 0.9852', '\\n', 'Epoch 9:\nvalidation_loss = 0.9852', '\\n', 'Epoch 10: validation_loss = 0.9852', '\\n',\n'Epoch 11: validation_loss = 0.9852', '\\n', 'Epoch 12: validation_loss =\n0.9852', '\\n', 'Epoch 13: validation_loss = 0.9852', '\\n', 'Epoch 14:\nvalidation_loss = 0.9851', '\\n', 'Epoch 15: validation_loss = 0.9851', '\\n',\n'Epoch 16: validation_loss = 0.9851', '\\n', 'Epoch 17: validation_loss =\n0.9850', '\\n', 'Epoch 18: validation_loss = 0.9850', '\\n', 'Epoch 19:\nvalidation_loss = 0.9849', '\\n', 'Epoch 20: validation_loss = 0.9849', '\\n',\n'Epoch 21: validation_loss = 0.9848', '\\n', 'Epoch 22: validation_loss =\n0.9847', '\\n', 'Epoch 23: validation_loss = 0.9846', '\\n', 'Epoch 24:\nvalidation_loss = 0.9845', '\\n', 'Epoch 25: validation_loss = 0.9844', '\\n',\n'Epoch 26: validation_loss = 0.9843', '\\n', 'Epoch 27: validation_loss =\n0.9842', '\\n', 'Epoch 28: validation_loss = 0.9841', '\\n', 'Epoch 29:\nvalidation_loss = 0.9840', '\\n', 'Epoch 30: validation_loss = 0.9838', '\\n',\n'Epoch 31: validation_loss = 0.9837', '\\n', 'Epoch 32: validation_loss =\n0.9835', '\\n', 'Epoch 33: validation_loss = 0.9834', '\\n', 'Epoch 34:\nvalidation_loss = 0.9832', '\\n', 'Epoch 35: validation_loss = 0.9830', '\\n',\n'Epoch 36: validation_loss = 0.9828', '\\n', 'Epoch 37: validation_loss =\n0.9826', '\\n', 'Epoch 38: validation_loss = 0.9823', '\\n', 'Epoch 39:\nvalidation_loss = 0.9821', '\\n', 'Epoch 40: validation_loss = 0.9818', '\\n',\n'Epoch 41: validation_loss = 0.9816', '\\n', 'Epoch 42: validation_loss =\n0.9813', '\\n', 'Epoch 43: validation_loss = 0.9810', '\\n', 'Epoch 44:\nvalidation_loss = 0.9807', '\\n', 'Epoch 45: validation_loss = 0.9804', '\\n',\n'Epoch 46: validation_loss = 0.9800', '\\n', 'Epoch 47: validation_loss =\n0.9797', '\\n', 'Epoch 48: validation_loss = 0.9793', '\\n', 'Epoch 49:\nvalidation_loss = 0.9790', '\\n', 'Epoch 50: validation_loss = 0.9786', '\\n',\n'Execution time: a second seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Downloading\nhttp://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz', '\\n', 'Failed to\ndownload (trying next):\\nHTTP Error 404: Not Found', '\\n', '\\n', 'Downloading\nhttps://ossci-datasets.s3.amazonaws.com/mnist/train-images-idx3-ubyte.gz', '\\n',\n'Downloading https://ossci-datasets.s3.amazonaws.com/mnist/train-images-\nidx3-ubyte.gz to ./data/MNIST/raw/train-images-idx3-ubyte.gz', '\\n', '\\r  0%|\n| 0.00/9.91M [00:00<?, ?B/s]', '\\r  0%|          | 32.8k/9.91M [00:00<01:14,\n132kB/s]', '\\r  1%|          | 65.5k/9.91M [00:00<01:14, 132kB/s]', '\\r  2%|1\n| 164k/9.91M [00:00<00:38, 251kB/s] ', '\\r  3%|3         | 328k/9.91M\n[00:00<00:23, 412kB/s]', '\\r  7%|6         | 688k/9.91M [00:01<00:11, 782kB/s]',\n'\\r 14%|#3        | 1.34M/9.91M [00:01<00:06, 1.41MB/s]', '\\r 27%|##7       |\n2.69M/9.91M [00:01<00:02, 2.71MB/s]', '\\r 41%|####      | 4.03M/9.91M\n[00:01<00:01, 4.38MB/s]', '\\r 54%|#####3    | 5.34M/9.91M [00:01<00:00,\n5.98MB/s]', '\\r 62%|######2   | 6.19M/9.91M [00:02<00:00, 6.29MB/s]', '\\r\n76%|#######6  | 7.54M/9.91M [00:02<00:00, 7.83MB/s]', '\\r 89%|########8 |\n8.78M/9.91M [00:02<00:00, 8.01MB/s]', '', '\\r100%|##########| 9.91M/9.91M\n[00:02<00:00, 4.12MB/s]', '\\n', 'Extracting ./data/MNIST/raw/train-images-\nidx3-ubyte.gz to ./data/MNIST/raw', '\\n', '\\n', 'Downloading\nhttp://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz', '\\n', 'Failed to\ndownload (trying next):\\nHTTP Error 404: Not Found', '\\n', '\\n', 'Downloading\nhttps://ossci-datasets.s3.amazonaws.com/mnist/train-labels-idx1-ubyte.gz', '\\n',\n'Downloading https://ossci-datasets.s3.amazonaws.com/mnist/train-labels-\nidx1-ubyte.gz to ./data/MNIST/raw/train-labels-idx1-ubyte.gz', '\\n', '\\r  0%|\n| 0.00/28.9k [00:00<?, ?B/s]', '\\r100%|##########| 28.9k/28.9k [00:00<00:00,\n120kB/s]', '', '\\r100%|##########| 28.9k/28.9k [00:00<00:00, 119kB/s]', '\\n',\n'Extracting ./data/MNIST/raw/train-labels-idx1-ubyte.gz to ./data/MNIST/raw',\n'\\n', '\\n', 'Downloading http://yann.lecun.com/exdb/mnist/t10k-images-\nidx3-ubyte.gz', '\\n', 'Failed to download (trying next):\\nHTTP Error 404: Not\nFound', '\\n', '\\n', 'Downloading https://ossci-\ndatasets.s3.amazonaws.com/mnist/t10k-images-idx3-ubyte.gz', '\\n', 'Downloading\nhttps://ossci-datasets.s3.amazonaws.com/mnist/t10k-images-idx3-ubyte.gz to\n./data/MNIST/raw/t10k-images-idx3-ubyte.gz', '\\n', '\\r  0%|          |\n0.00/1.65M [00:00<?, ?B/s]', '\\r  2%|1         | 32.8k/1.65M [00:00<00:36,\n44.3kB/s]', '\\r  4%|3         | 65.5k/1.65M [00:01<00:35, 44.3kB/s]', '\\r  6%|5\n| 98.3k/1.65M [00:01<00:29, 51.9kB/s]', '\\r  8%|7         | 131k/1.65M\n[00:02<00:26, 56.8kB/s] ', '\\r 10%|9         | 164k/1.65M [00:02<00:24,\n60.2kB/s]', '\\r 12%|#1        | 197k/1.65M [00:03<00:19, 73.9kB/s]', '\\r 14%|#3\n| 229k/1.65M [00:03<00:16, 86.0kB/s]', '\\r 16%|#5        | 262k/1.65M\n[00:03<00:14, 97.4kB/s]', '\\r 18%|#7        | 295k/1.65M [00:03<00:12, 106kB/s]\n', '\\r 20%|#9        | 328k/1.65M [00:04<00:11, 114kB/s]', '\\r 24%|##3       |\n393k/1.65M [00:04<00:08, 155kB/s]', '\\r 28%|##7       | 459k/1.65M [00:04<00:06,\n186kB/s]', '\\r 30%|##9       | 492k/1.65M [00:04<00:06, 171kB/s]', '\\r 36%|###5\n| 590k/1.65M [00:05<00:04, 237kB/s]', '\\r 42%|####1     | 688k/1.65M\n[00:05<00:03, 284kB/s]', '\\r 46%|####5     | 754k/1.65M [00:05<00:03, 279kB/s]',\n'\\r 54%|#####3    | 885k/1.65M [00:05<00:02, 354kB/s]', '\\r 62%|######1   |\n1.02M/1.65M [00:06<00:01, 406kB/s]', '\\r 70%|######9   | 1.15M/1.65M\n[00:06<00:01, 444kB/s]', '\\r 79%|#######9  | 1.31M/1.65M [00:06<00:00,\n509kB/s]', '\\r 89%|########9 | 1.47M/1.65M [00:06<00:00, 556kB/s]', '',\n'\\r100%|##########| 1.65M/1.65M [00:06<00:00, 237kB/s]', '\\n', 'Extracting\n./data/MNIST/raw/t10k-images-idx3-ubyte.gz to ./data/MNIST/raw', '\\n', '\\n',\n'Downloading http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz', '\\n',\n'Failed to download (trying next):\\nHTTP Error 404: Not Found', '\\n', '\\n',\n'Downloading https://ossci-datasets.s3.amazonaws.com/mnist/t10k-labels-\nidx1-ubyte.gz', '\\n', 'Downloading https://ossci-\ndatasets.s3.amazonaws.com/mnist/t10k-labels-idx1-ubyte.gz to\n./data/MNIST/raw/t10k-labels-idx1-ubyte.gz', '\\n', '\\r  0%|          |\n0.00/4.54k [00:00<?, ?B/s]', '', '\\r100%|##########| 4.54k/4.54k [00:00<00:00,\n2.95MB/s]', '\\n', 'Extracting ./data/MNIST/raw/t10k-labels-idx1-ubyte.gz to\n./data/MNIST/raw', '\\n', '\\n', 'Epoch 1: validation_loss = 0.0602', '\\n', 'Epoch\n1: validation_loss = 0.0551', '\\n', 'Layer conv1 Epoch 1: validation_loss =\n0.5729', '\\n', 'Layer conv2 Epoch 1: validation_loss = 0.7459', '\\n', 'Epoch 1:\nglobal relative weight reconstruction error = 0.6886', '\\n', 'Layer conv1 Epoch\n2: validation_loss = 0.5545', '\\n', 'Layer conv2 Epoch 2: validation_loss =\n0.7496', '\\n', 'Epoch 2: global relative weight reconstruction error = 0.6974',\n'\\n', 'Layer conv1 Epoch 3: validation_loss = 0.5352', '\\n', 'Layer conv2 Epoch\n3: validation_loss = 0.7374', '\\n', 'Epoch 3: global relative weight\nreconstruction error = 0.6814', '\\n', 'Layer conv1 Epoch 4: validation_loss =\n0.5502', '\\n', 'Layer conv2 Epoch 4: validation_loss = 0.7332', '\\n', 'Epoch 4:\nglobal relative weight reconstruction error = 0.6702', '\\n', 'Layer conv1 Epoch\n5: validation_loss = 0.5617', '\\n', 'Layer conv2 Epoch 5: validation_loss =\n0.7263', '\\n', 'Epoch 5: global relative weight reconstruction error = 0.6914',\n'\\n', 'Layer conv1 Epoch 6: validation_loss = 0.5430', '\\n', 'Layer conv2 Epoch\n6: validation_loss = 0.7299', '\\n', 'Epoch 6: global relative weight\nreconstruction error = 0.6745', '\\n', 'Layer conv1 Epoch 7: validation_loss =\n0.5282', '\\n', 'Layer conv2 Epoch 7: validation_loss = 0.7368', '\\n', 'Epoch 7:\nglobal relative weight reconstruction error = 0.6634', '\\n', 'Layer conv1 Epoch\n8: validation_loss = 0.5496', '\\n', 'Layer conv2 Epoch 8: validation_loss =\n0.7298', '\\n', 'Epoch 8: global relative weight reconstruction error = 0.6851',\n'\\n', 'Layer conv1 Epoch 9: validation_loss = 0.5449', '\\n', 'Layer conv2 Epoch\n9: validation_loss = 0.7538', '\\n', 'Epoch 9: global relative weight\nreconstruction error = 0.6836', '\\n', 'Layer conv1 Epoch 10: validation_loss =\n0.5474', '\\n', 'Layer conv2 Epoch 10: validation_loss = 0.7322', '\\n', 'Epoch\n10: global relative weight reconstruction error = 0.6876', '\\n', 'Reconstructed\nmodel test accuracy: 0.1135', '\\n', 'Overall relative weight reconstruction\nerror: 1.1480', '\\n', 'Execution time: 46 seconds seconds (time limit is an\nhour).']", "['Using device: cuda', '\\n', 'Epoch 1: validation_loss = 0.9852', '\\n', 'Epoch\n2: validation_loss = 0.9852', '\\n', 'Epoch 3: validation_loss = 0.9852', '\\n',\n'Epoch 4: validation_loss = 0.9853', '\\n', 'Epoch 5: validation_loss = 0.9853',\n'\\n', 'Epoch 6: validation_loss = 0.9853', '\\n', 'Epoch 7: validation_loss =\n0.9853', '\\n', 'Epoch 8: validation_loss = 0.9852', '\\n', 'Epoch 9:\nvalidation_loss = 0.9852', '\\n', 'Epoch 10: validation_loss = 0.9852', '\\n',\n'Epoch 11: validation_loss = 0.9852', '\\n', 'Epoch 12: validation_loss =\n0.9852', '\\n', 'Epoch 13: validation_loss = 0.9852', '\\n', 'Epoch 14:\nvalidation_loss = 0.9851', '\\n', 'Epoch 15: validation_loss = 0.9851', '\\n',\n'Epoch 16: validation_loss = 0.9851', '\\n', 'Epoch 17: validation_loss =\n0.9850', '\\n', 'Epoch 18: validation_loss = 0.9850', '\\n', 'Epoch 19:\nvalidation_loss = 0.9849', '\\n', 'Epoch 20: validation_loss = 0.9849', '\\n',\n'Epoch 21: validation_loss = 0.9848', '\\n', 'Epoch 22: validation_loss =\n0.9847', '\\n', 'Epoch 23: validation_loss = 0.9846', '\\n', 'Epoch 24:\nvalidation_loss = 0.9845', '\\n', 'Epoch 25: validation_loss = 0.9844', '\\n',\n'Epoch 26: validation_loss = 0.9843', '\\n', 'Epoch 27: validation_loss =\n0.9842', '\\n', 'Epoch 28: validation_loss = 0.9841', '\\n', 'Epoch 29:\nvalidation_loss = 0.9840', '\\n', 'Epoch 30: validation_loss = 0.9838', '\\n',\n'Epoch 31: validation_loss = 0.9837', '\\n', 'Epoch 32: validation_loss =\n0.9835', '\\n', 'Epoch 33: validation_loss = 0.9834', '\\n', 'Epoch 34:\nvalidation_loss = 0.9832', '\\n', 'Epoch 35: validation_loss = 0.9830', '\\n',\n'Epoch 36: validation_loss = 0.9828', '\\n', 'Epoch 37: validation_loss =\n0.9826', '\\n', 'Epoch 38: validation_loss = 0.9823', '\\n', 'Epoch 39:\nvalidation_loss = 0.9821', '\\n', 'Epoch 40: validation_loss = 0.9818', '\\n',\n'Epoch 41: validation_loss = 0.9816', '\\n', 'Epoch 42: validation_loss =\n0.9813', '\\n', 'Epoch 43: validation_loss = 0.9810', '\\n', 'Epoch 44:\nvalidation_loss = 0.9807', '\\n', 'Epoch 45: validation_loss = 0.9804', '\\n',\n'Epoch 46: validation_loss = 0.9800', '\\n', 'Epoch 47: validation_loss =\n0.9797', '\\n', 'Epoch 48: validation_loss = 0.9793', '\\n', 'Epoch 49:\nvalidation_loss = 0.9790', '\\n', 'Epoch 50: validation_loss = 0.9786', '\\n',\n'Execution time: a second seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Epoch 1: validation_loss = 0.9852', '\\n', 'Epoch\n2: validation_loss = 0.9852', '\\n', 'Epoch 3: validation_loss = 0.9852', '\\n',\n'Epoch 4: validation_loss = 0.9853', '\\n', 'Epoch 5: validation_loss = 0.9853',\n'\\n', 'Epoch 6: validation_loss = 0.9853', '\\n', 'Epoch 7: validation_loss =\n0.9853', '\\n', 'Epoch 8: validation_loss = 0.9852', '\\n', 'Epoch 9:\nvalidation_loss = 0.9852', '\\n', 'Epoch 10: validation_loss = 0.9852', '\\n',\n'Epoch 11: validation_loss = 0.9852', '\\n', 'Epoch 12: validation_loss =\n0.9852', '\\n', 'Epoch 13: validation_loss = 0.9852', '\\n', 'Epoch 14:\nvalidation_loss = 0.9851', '\\n', 'Epoch 15: validation_loss = 0.9851', '\\n',\n'Epoch 16: validation_loss = 0.9851', '\\n', 'Epoch 17: validation_loss =\n0.9850', '\\n', 'Epoch 18: validation_loss = 0.9850', '\\n', 'Epoch 19:\nvalidation_loss = 0.9849', '\\n', 'Epoch 20: validation_loss = 0.9849', '\\n',\n'Epoch 21: validation_loss = 0.9848', '\\n', 'Epoch 22: validation_loss =\n0.9847', '\\n', 'Epoch 23: validation_loss = 0.9846', '\\n', 'Epoch 24:\nvalidation_loss = 0.9845', '\\n', 'Epoch 25: validation_loss = 0.9844', '\\n',\n'Epoch 26: validation_loss = 0.9843', '\\n', 'Epoch 27: validation_loss =\n0.9842', '\\n', 'Epoch 28: validation_loss = 0.9841', '\\n', 'Epoch 29:\nvalidation_loss = 0.9840', '\\n', 'Epoch 30: validation_loss = 0.9838', '\\n',\n'Epoch 31: validation_loss = 0.9837', '\\n', 'Epoch 32: validation_loss =\n0.9835', '\\n', 'Epoch 33: validation_loss = 0.9834', '\\n', 'Epoch 34:\nvalidation_loss = 0.9832', '\\n', 'Epoch 35: validation_loss = 0.9830', '\\n',\n'Epoch 36: validation_loss = 0.9828', '\\n', 'Epoch 37: validation_loss =\n0.9826', '\\n', 'Epoch 38: validation_loss = 0.9823', '\\n', 'Epoch 39:\nvalidation_loss = 0.9821', '\\n', 'Epoch 40: validation_loss = 0.9818', '\\n',\n'Epoch 41: validation_loss = 0.9816', '\\n', 'Epoch 42: validation_loss =\n0.9813', '\\n', 'Epoch 43: validation_loss = 0.9810', '\\n', 'Epoch 44:\nvalidation_loss = 0.9807', '\\n', 'Epoch 45: validation_loss = 0.9804', '\\n',\n'Epoch 46: validation_loss = 0.9800', '\\n', 'Epoch 47: validation_loss =\n0.9797', '\\n', 'Epoch 48: validation_loss = 0.9793', '\\n', 'Epoch 49:\nvalidation_loss = 0.9790', '\\n', 'Epoch 50: validation_loss = 0.9786', '\\n',\n'Execution time: a second seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Epoch 1: validation_loss = 0.9852', '\\n', 'Epoch\n2: validation_loss = 0.9852', '\\n', 'Epoch 3: validation_loss = 0.9852', '\\n',\n'Epoch 4: validation_loss = 0.9853', '\\n', 'Epoch 5: validation_loss = 0.9853',\n'\\n', 'Epoch 6: validation_loss = 0.9853', '\\n', 'Epoch 7: validation_loss =\n0.9853', '\\n', 'Epoch 8: validation_loss = 0.9852', '\\n', 'Epoch 9:\nvalidation_loss = 0.9852', '\\n', 'Epoch 10: validation_loss = 0.9852', '\\n',\n'Epoch 11: validation_loss = 0.9852', '\\n', 'Epoch 12: validation_loss =\n0.9852', '\\n', 'Epoch 13: validation_loss = 0.9852', '\\n', 'Epoch 14:\nvalidation_loss = 0.9851', '\\n', 'Epoch 15: validation_loss = 0.9851', '\\n',\n'Epoch 16: validation_loss = 0.9851', '\\n', 'Epoch 17: validation_loss =\n0.9850', '\\n', 'Epoch 18: validation_loss = 0.9850', '\\n', 'Epoch 19:\nvalidation_loss = 0.9849', '\\n', 'Epoch 20: validation_loss = 0.9849', '\\n',\n'Epoch 21: validation_loss = 0.9848', '\\n', 'Epoch 22: validation_loss =\n0.9847', '\\n', 'Epoch 23: validation_loss = 0.9846', '\\n', 'Epoch 24:\nvalidation_loss = 0.9845', '\\n', 'Epoch 25: validation_loss = 0.9844', '\\n',\n'Epoch 26: validation_loss = 0.9843', '\\n', 'Epoch 27: validation_loss =\n0.9842', '\\n', 'Epoch 28: validation_loss = 0.9841', '\\n', 'Epoch 29:\nvalidation_loss = 0.9840', '\\n', 'Epoch 30: validation_loss = 0.9838', '\\n',\n'Epoch 31: validation_loss = 0.9837', '\\n', 'Epoch 32: validation_loss =\n0.9835', '\\n', 'Epoch 33: validation_loss = 0.9834', '\\n', 'Epoch 34:\nvalidation_loss = 0.9832', '\\n', 'Epoch 35: validation_loss = 0.9830', '\\n',\n'Epoch 36: validation_loss = 0.9828', '\\n', 'Epoch 37: validation_loss =\n0.9826', '\\n', 'Epoch 38: validation_loss = 0.9823', '\\n', 'Epoch 39:\nvalidation_loss = 0.9821', '\\n', 'Epoch 40: validation_loss = 0.9818', '\\n',\n'Epoch 41: validation_loss = 0.9816', '\\n', 'Epoch 42: validation_loss =\n0.9813', '\\n', 'Epoch 43: validation_loss = 0.9810', '\\n', 'Epoch 44:\nvalidation_loss = 0.9807', '\\n', 'Epoch 45: validation_loss = 0.9804', '\\n',\n'Epoch 46: validation_loss = 0.9800', '\\n', 'Epoch 47: validation_loss =\n0.9797', '\\n', 'Epoch 48: validation_loss = 0.9793', '\\n', 'Epoch 49:\nvalidation_loss = 0.9790', '\\n', 'Epoch 50: validation_loss = 0.9786', '\\n',\n'Execution time: a second seconds (time limit is an hour).']", ""], "analysis": ["The script fails because scikit-learn is not installed in the environment,\ncausing ModuleNotFoundError on importing MiniBatchDictionaryLearning. To fix,\ninstall scikit-learn (e.g., via `pip install scikit-learn`) or add it to the\nproject dependencies.", "The error \"can't optimize a non-leaf Tensor\" occurs because C and D are created\nas non-leaf tensors (they are the result of multiplying a `torch.randn(...,\nrequires_grad=True)` tensor by 0.1). The optimizer in PyTorch only accepts leaf\ntensors with `requires_grad=True`.   Proposed fix:  - Wrap C and D in\n`torch.nn.Parameter` so they are registered as leaf parameters, e.g.:\n```python   C = torch.nn.Parameter(torch.randn(n_models, K, device=device) *\n0.1)   D = torch.nn.Parameter(torch.randn(K, dim, device=device) * 0.1)   ``` -\nAlternatively, initialize with `C = torch.randn(..., requires_grad=True); C *=\n0.1` (in-place scaling) to preserve leaf status. This will allow the optimizer\nto update them without error.", "The script fails with ModuleNotFoundError: No module named 'sklearn'. The\nsklearn dependency (scikit-learn) is missing in the environment. To fix, install\nscikit-learn (e.g., via pip install scikit-learn) or replace the use of\nMiniBatchDictionaryLearning with a PyTorch-based implementation.", "The validation loss steadily increases from ~0.9876 to ~1.0252 over 100 epochs,\nindicating the model fails to learn and instead diverges toward a trivial\nsolution (C\u21920, D\u2192\u221e) due to the L1 penalty on codes and unconstrained dictionary\nnorms. To fix this, enforce unit\u2010norm constraints on dictionary atoms after each\nupdate or add a regularization term on D, lower the learning rate, and consider\nalternating updates for C and D using a proximal method.", "", "The script runs without runtime errors, but the reconstructed model performs at\nrandom chance (~11% accuracy) and shows high relative reconstruction error. Two\nmain flaws cause this:  1) The custom k-means update incorrectly resets each\ndictionary atom to the mean of only the current mini-batch assignments,\npreventing prototypes from converging across the full dataset.  2) The\nreconstruction step only replaces the convolutional layer weights (conv1/conv2)\nand leaves the fully connected layers (fc1/fc2) randomly initialized, so the new\nnetwork has untrained output layers.   Proposed fixes: - Implement a proper\nk-means: aggregate assignments over the entire dataset each epoch (or maintain\nrunning counts/averages) instead of per batch resets so dictionary atoms\nconverge correctly. - Extend dictionary learning (or simple initialization and\nfine-tuning) to the fully connected layers, or fine-tune the reconstructed model\nend-to-end after copying weights to recover the fc layer parameters.", "", "", "", ""], "exc_type": ["ModuleNotFoundError", "ValueError", "ModuleNotFoundError", null, null, null, null, null, null, null], "exc_info": [{"args": ["No module named 'sklearn'"], "name": "sklearn", "msg": "No module named 'sklearn'"}, {"args": ["can't optimize a non-leaf Tensor"]}, {"args": ["No module named 'sklearn'"], "name": "sklearn", "msg": "No module named 'sklearn'"}, null, null, null, null, null, null, null], "exc_stack": [[["/data/chenhui/AI-Scientist-v2/ai_scientist/treesearch/interpreter.py", 144, "_run_session", "exec(compile(code, self.agent_file_name, \"exec\"), global_scope)"], ["runfile.py", 12, "<module>", "from sklearn.decomposition import MiniBatchDictionaryLearning"]], [["/data/chenhui/AI-Scientist-v2/ai_scientist/treesearch/interpreter.py", 144, "_run_session", "exec(compile(code, self.agent_file_name, \"exec\"), global_scope)"], ["runfile.py", 31, "<module>", "optimizer = torch.optim.Adam([C, D], lr=lr)"], ["/home/chenhui/miniconda3/envs/ai_scientist/lib/python3.11/site-packages/torch/optim/adam.py", 78, "__init__", "super().__init__(params, defaults)"], ["/home/chenhui/miniconda3/envs/ai_scientist/lib/python3.11/site-packages/torch/optim/optimizer.py", 371, "__init__", "self.add_param_group(cast(dict, param_group))"], ["/home/chenhui/miniconda3/envs/ai_scientist/lib/python3.11/site-packages/torch/_compile.py", 32, "inner", "return disable_fn(*args, **kwargs)"], ["/home/chenhui/miniconda3/envs/ai_scientist/lib/python3.11/site-packages/torch/_dynamo/eval_frame.py", 632, "_fn", "return fn(*args, **kwargs)"], ["/home/chenhui/miniconda3/envs/ai_scientist/lib/python3.11/site-packages/torch/optim/optimizer.py", 1026, "add_param_group", "raise ValueError(\"can't optimize a non-leaf Tensor\")"]], [["/data/chenhui/AI-Scientist-v2/ai_scientist/treesearch/interpreter.py", 144, "_run_session", "exec(compile(code, self.agent_file_name, \"exec\"), global_scope)"], ["runfile.py", 15, "<module>", "from sklearn.decomposition import MiniBatchDictionaryLearning"]], null, null, null, null, null, null, null], "exp_name": "0-run", "metrics": [{"metric_names": [{"metric_name": "value", "lower_is_better": true, "description": "", "data": [{"dataset_name": "default", "final_value": null, "best_value": null}]}]}, {"metric_names": [{"metric_name": "value", "lower_is_better": true, "description": "", "data": [{"dataset_name": "default", "final_value": null, "best_value": null}]}]}, {"metric_names": [{"metric_name": "value", "lower_is_better": true, "description": "", "data": [{"dataset_name": "default", "final_value": null, "best_value": null}]}]}, {"metric_names": [{"metric_name": "train reconstruction error", "lower_is_better": true, "description": "Final reconstruction error on the training set", "data": [{"dataset_name": "synthetic_weight_dataset", "final_value": 0.0105, "best_value": 0.0105}]}, {"metric_name": "validation reconstruction error", "lower_is_better": true, "description": "Final reconstruction error on the validation set", "data": [{"dataset_name": "synthetic_weight_dataset", "final_value": 1.0216, "best_value": 1.0216}]}, {"metric_name": "train loss", "lower_is_better": true, "description": "Final loss on the training set", "data": [{"dataset_name": "synthetic_weight_dataset", "final_value": 0.0001, "best_value": 0.0001}]}, {"metric_name": "validation loss", "lower_is_better": true, "description": "Final loss on the validation set", "data": [{"dataset_name": "synthetic_weight_dataset", "final_value": 1.0252, "best_value": 1.0252}]}]}, {"metric_names": [{"metric_name": "training relative error", "lower_is_better": true, "description": "Relative error on the training set", "data": [{"dataset_name": "synthetic", "final_value": 21.287, "best_value": 21.287}]}, {"metric_name": "validation relative error", "lower_is_better": true, "description": "Relative error on the validation set", "data": [{"dataset_name": "synthetic", "final_value": 0.9786, "best_value": 0.9786}]}, {"metric_name": "training reconstruction MSE", "lower_is_better": true, "description": "Mean squared error of reconstruction on the training set", "data": [{"dataset_name": "synthetic", "final_value": 8.8067, "best_value": 8.8067}]}, {"metric_name": "validation reconstruction MSE", "lower_is_better": true, "description": "Mean squared error of reconstruction on the validation set", "data": [{"dataset_name": "synthetic", "final_value": 2.9568, "best_value": 2.9568}]}]}, {"metric_names": [{"metric_name": "training reconstruction error", "lower_is_better": true, "description": "Final reconstruction error on training data for each dataset.", "data": [{"dataset_name": "conv1", "final_value": 0.5379, "best_value": 0.5379}, {"dataset_name": "conv2", "final_value": 0.73, "best_value": 0.73}]}, {"metric_name": "validation reconstruction error", "lower_is_better": true, "description": "Final reconstruction error on validation data for each dataset.", "data": [{"dataset_name": "conv1", "final_value": 0.5474, "best_value": 0.5474}, {"dataset_name": "conv2", "final_value": 0.7322, "best_value": 0.7322}]}, {"metric_name": "global relative weight reconstruction error", "lower_is_better": true, "description": "Final relative weight reconstruction error on the global dataset.", "data": [{"dataset_name": "global", "final_value": 0.6876, "best_value": 0.6876}]}, {"metric_name": "test accuracy", "lower_is_better": false, "description": "Final accuracy on test data for the reconstructed_model dataset.", "data": [{"dataset_name": "reconstructed_model", "final_value": 0.1135, "best_value": 0.1135}]}, {"metric_name": "relative reconstruction error", "lower_is_better": true, "description": "Final relative reconstruction error for the reconstructed_model dataset.", "data": [{"dataset_name": "reconstructed_model", "final_value": 1.148, "best_value": 1.148}]}]}, {"metric_names": [{"metric_name": "training relative error", "lower_is_better": true, "description": "Relative error on the training set", "data": [{"dataset_name": "synthetic", "final_value": 21.287, "best_value": 21.287}]}, {"metric_name": "validation relative error", "lower_is_better": true, "description": "Relative error on the validation set", "data": [{"dataset_name": "synthetic", "final_value": 0.9786, "best_value": 0.9786}]}, {"metric_name": "training reconstruction MSE", "lower_is_better": true, "description": "Mean squared error of reconstruction on the training set", "data": [{"dataset_name": "synthetic", "final_value": 8.8067, "best_value": 8.8067}]}, {"metric_name": "validation reconstruction MSE", "lower_is_better": true, "description": "Mean squared error of reconstruction on the validation set", "data": [{"dataset_name": "synthetic", "final_value": 2.9568, "best_value": 2.9568}]}]}, {"metric_names": [{"metric_name": "training relative error", "lower_is_better": true, "description": "Final relative error on the training split of the synthetic dataset", "data": [{"dataset_name": "synthetic", "final_value": 21.287, "best_value": 21.287}]}, {"metric_name": "validation relative error", "lower_is_better": true, "description": "Final relative error on the validation split of the synthetic dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.9786, "best_value": 0.9786}]}, {"metric_name": "training reconstruction mean squared error", "lower_is_better": true, "description": "Final reconstruction mean squared error (MSE) on the training split of the synthetic dataset", "data": [{"dataset_name": "synthetic", "final_value": 8.8067, "best_value": 8.8067}]}, {"metric_name": "validation reconstruction mean squared error", "lower_is_better": true, "description": "Final reconstruction mean squared error (MSE) on the validation split of the synthetic dataset", "data": [{"dataset_name": "synthetic", "final_value": 2.9568, "best_value": 2.9568}]}]}, {"metric_names": [{"metric_name": "training relative error", "lower_is_better": true, "description": "Relative error on the training set", "data": [{"dataset_name": "synthetic", "final_value": 21.287, "best_value": 21.287}]}, {"metric_name": "validation relative error", "lower_is_better": true, "description": "Relative error on the validation set", "data": [{"dataset_name": "synthetic", "final_value": 0.9786, "best_value": 0.9786}]}, {"metric_name": "training reconstruction MSE", "lower_is_better": true, "description": "Reconstruction mean squared error on the training set", "data": [{"dataset_name": "synthetic", "final_value": 8.8067, "best_value": 8.8067}]}, {"metric_name": "validation reconstruction MSE", "lower_is_better": true, "description": "Reconstruction mean squared error on the validation set", "data": [{"dataset_name": "synthetic", "final_value": 2.9568, "best_value": 2.9568}]}]}, {"metric_names": [{"metric_name": "value", "lower_is_better": true, "description": "", "data": [{"dataset_name": "default", "final_value": null, "best_value": null}]}]}], "is_best_node": [false, false, false, false, true, false, false, false, false, false], "plots": [[], [], [], [], ["../../logs/0-run/experiment_results/experiment_98c42c90b1154c369c686a9c6d0c5de4_proc_103092/synthetic_losses_plot.png", "../../logs/0-run/experiment_results/experiment_98c42c90b1154c369c686a9c6d0c5de4_proc_103092/synthetic_metrics_plot.png"], [], ["../../logs/0-run/experiment_results/experiment_91521c88da8347558b30b105ff951d99_proc_103091/synthetic_losses_plot.png", "../../logs/0-run/experiment_results/experiment_91521c88da8347558b30b105ff951d99_proc_103091/synthetic_metrics_plot.png"], ["../../logs/0-run/experiment_results/experiment_62e80975b1b143ad83eda1f52d796f6a_proc_103092/synthetic_losses_plot.png", "../../logs/0-run/experiment_results/experiment_62e80975b1b143ad83eda1f52d796f6a_proc_103092/synthetic_metrics_plot.png"], ["../../logs/0-run/experiment_results/experiment_08ecc5ccc08e4289a6dd7b6b1701b055_proc_103093/synthetic_losses_plot.png", "../../logs/0-run/experiment_results/experiment_08ecc5ccc08e4289a6dd7b6b1701b055_proc_103093/synthetic_metrics_plot.png"], ["../../logs/0-run/experiment_results/seed_aggregation_3c291302cec74bc98ac24f8cb2c993cb/synthetic_metrics_mean_se.png", "../../logs/0-run/experiment_results/seed_aggregation_3c291302cec74bc98ac24f8cb2c993cb/synthetic_losses_mean_se.png"]], "plot_paths": [[], [], [], [], ["experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_98c42c90b1154c369c686a9c6d0c5de4_proc_103092/synthetic_losses_plot.png", "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_98c42c90b1154c369c686a9c6d0c5de4_proc_103092/synthetic_metrics_plot.png"], [], ["experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_91521c88da8347558b30b105ff951d99_proc_103091/synthetic_losses_plot.png", "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_91521c88da8347558b30b105ff951d99_proc_103091/synthetic_metrics_plot.png"], ["experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_62e80975b1b143ad83eda1f52d796f6a_proc_103092/synthetic_losses_plot.png", "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_62e80975b1b143ad83eda1f52d796f6a_proc_103092/synthetic_metrics_plot.png"], ["experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_08ecc5ccc08e4289a6dd7b6b1701b055_proc_103093/synthetic_losses_plot.png", "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_08ecc5ccc08e4289a6dd7b6b1701b055_proc_103093/synthetic_metrics_plot.png"], ["experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/seed_aggregation_3c291302cec74bc98ac24f8cb2c993cb/synthetic_metrics_mean_se.png", "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/seed_aggregation_3c291302cec74bc98ac24f8cb2c993cb/synthetic_losses_mean_se.png"]], "plot_analyses": [[], [], [], [], [{"analysis": "Training loss steadily decreases from roughly 33 to around 9 over 50 epochs, indicating the model is fitting the synthetic training data well and that the dictionary learning mechanism is capturing more variance in the weight vectors as training proceeds. However, validation loss remains essentially flat at about 3 throughout training. This large gap between training and validation loss suggests that although the model is improving its fit to the training set, these improvements are not translating to the held-out data. Possible causes include a miscalculation in the validation-loss routine (e.g., evaluating on a single batch or stale batches), improper dictionary updates during validation, or overfitting to the training set.\n", "plot_path": "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_98c42c90b1154c369c686a9c6d0c5de4_proc_103092/synthetic_losses_plot.png"}, {"analysis": "Training relative error drops from about 45% down to about 21%, again showing that the sparse reconstruction is improving on the training set. Validation error, however, stays fixed at approximately 1 (or 100%), which is clearly anomalous. A constant validation error suggests either that the wrong labels are being used in validation, the validation metric is not being updated each epoch, or there is a bug in the evaluation loop (e.g., forgetting to compute gradients or to switch to evaluation mode). No meaningful generalization improvement is observed.", "plot_path": "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_98c42c90b1154c369c686a9c6d0c5de4_proc_103092/synthetic_metrics_plot.png"}], [], [{"analysis": "Training loss exhibits a smooth and consistent downward trajectory from around 33 to under 10 across 50 epochs, while validation loss remains virtually unchanged at roughly 3.0 throughout. This suggests that the model is fitting the synthetic training data increasingly well but that those improvements are not translating to validation data\u2014potentially pointing to a reporting or data pipeline issue, or to the synthetic validation set being too easy or identical to a constant baseline.", "plot_path": "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_91521c88da8347558b30b105ff951d99_proc_103091/synthetic_losses_plot.png"}, {"analysis": "Training relative error declines steadily from approximately 46% to 21% over the same epoch range, whereas validation error stays fixed around 1%. Such a stark divergence and completely flat validation-error curve strongly indicates either a bug in logging/metric computation for the validation split or a scenario where the validation samples are trivial or degenerate, yielding a floor effect that prevents any observable improvement.", "plot_path": "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_91521c88da8347558b30b105ff951d99_proc_103091/synthetic_metrics_plot.png"}], [{"analysis": "Training vs Validation Loss on Synthetic Dataset shows that training MSE decreases steadily from about 33.0 down to approximately 9.0 over 50 epochs, demonstrating that the dictionary\u2010learning objective is being optimized on the training set. Validation MSE, however, remains nearly constant around 3.0 throughout. Two observations emerge: (1) Validation loss is lower than training loss at epoch 1 and stays flat, suggesting either an unusually simple or extremely biased validation set, or an error in how validation metrics are computed or recorded. (2) The continual reduction in training loss without any change on validation implies that improvements on the training weight reconstructions do not transfer to unseen data. This could mean underfitting of the learned weight primitives to out\u2010of\u2010sample models or an issue in the validation pipeline. Before proceeding, it is crucial to verify the validation data split, metric\u2010logging code, and to consider introducing regularization or a more challenging synthetic validation set to assess generalization effectively.", "plot_path": "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_62e80975b1b143ad83eda1f52d796f6a_proc_103092/synthetic_losses_plot.png"}, {"analysis": "Training vs Validation Error on Synthetic Dataset reveals that relative training error drops from about 45% to 21% over the course of 50 epochs. In contrast, validation error is essentially flat at ~1%. The extremely low, unchanging validation error is highly suspicious\u2014either the synthetic task is trivial (leading to near\u2010perfect accuracy on unseen examples) or there is a bug in the validation\u2010error computation. The discrepancy indicates the current dictionary of weight primitives can be fitted progressively to the training models, but the validation measure is not sensitive to those refinements. At this preliminary implementation stage, confirming the correctness of the validation\u2010error calculation, ensuring proper holdout sampling, and maybe using a less trivial synthetic target are recommended steps before scaling up experiments.", "plot_path": "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_62e80975b1b143ad83eda1f52d796f6a_proc_103092/synthetic_metrics_plot.png"}], [{"analysis": "Training loss steadily decreases from around 33 down to roughly 9 over the course of 50 epochs, while validation loss remains essentially flat at about 3. This large gap between training and validation curves suggests either the model is overfitting to the synthetic training data or the validation loss isn\u2019t being updated correctly. The near-constant validation loss indicates stagnation in generalization performance or a potential logging/evaluation bug (for example, forgetting to switch to evaluation mode or not resetting the loss accumulator). It\u2019s important to verify the validation loop, ensure model.eval() is called, and confirm that loss calculations are correct and reset each epoch.", "plot_path": "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_08ecc5ccc08e4289a6dd7b6b1701b055_proc_103093/synthetic_losses_plot.png"}, {"analysis": "Training relative error declines from approximately 45 down to about 21 over 50 epochs, yet the validation relative error stays fixed around 1. This plateau in validation error mirrors the behavior seen in the loss plot, pointing again to either an inability to improve on unseen data or, more likely, an implementation issue in metric computation. Possible culprits include wrong error formula, forgetting to normalize by batch size, or failing to update/reset the validation error accumulator. Double-check the validation metric implementation and the data pipeline to obtain meaningful error measurements.", "plot_path": "experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_08ecc5ccc08e4289a6dd7b6b1701b055_proc_103093/synthetic_metrics_plot.png"}], []], "vlm_feedback_summary": ["[]", "[]", "[]", "[]", "Training metrics show strong improvement but validation metrics are flat,\nindicating a likely evaluation bug or severe overfitting. Double-check\nvalidation data pipeline and metric computation before drawing conclusions.", "[]", "Training metrics improve substantially while validation metrics remain flat,\nindicating a likely issue with validation logging, dataset construction, or\nevaluation pipeline.", "Both loss and error plots show consistent improvements on the training set while\nvalidation metrics remain static at unexpectedly low values. This suggests a\npotential issue in validation metric computation or an overly simplistic\nsynthetic validation set. Recommended next steps: debug the validation pipeline,\nverify dataset splits, and increase validation complexity to properly assess\ngeneralization of the learned weight primitives.", "Validation metrics remain unchanged despite substantial training improvements,\nlikely due to a logging or evaluation bug. Before drawing conclusions on model\nsynthesis or generalization, fix the validation loop (use eval mode, correct\nmetric updates) so that validation loss and error accurately reflect performance\non unseen data.", "[]"], "exec_time": [0.9708859920501709, 1.132788896560669, 0.9638066291809082, 1.5347950458526611, 1.5848097801208496, 46.63965845108032, 1.6838390827178955, 1.6503796577453613, 1.6786715984344482, null], "exec_time_feedback": ["", "", "", "", "", "", "", "", "", ""], "datasets_successfully_tested": [[], [], [], [], ["[]"], [], [""], ["[]"], ["[]"], []], "plot_code": [null, null, null, null, "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n# Load experiment data\ntry:\n    experiment_data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    experiment_data = {}\n\n# Extract synthetic dataset entries\nsynthetic = experiment_data.get(\"synthetic\", {})\nmetrics = synthetic.get(\"metrics\", {})\nlosses = synthetic.get(\"losses\", {})\nepochs = range(1, len(metrics.get(\"train\", [])) + 1)\n\n# Plot training and validation error\ntry:\n    plt.figure()\n    plt.plot(epochs, metrics.get(\"train\", []), label=\"Train Error\")\n    plt.plot(epochs, metrics.get(\"val\", []), label=\"Val Error\")\n    plt.xlabel(\"Epoch\")\n    plt.ylabel(\"Relative Error\")\n    plt.title(\"Training vs Validation Error\\nDataset: Synthetic\")\n    plt.legend()\n    plt.savefig(os.path.join(working_dir, \"synthetic_metrics_plot.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot1: {e}\")\n    plt.close()\n\n# Plot training and validation losses\ntry:\n    plt.figure()\n    plt.plot(epochs, losses.get(\"train\", []), label=\"Train Loss\")\n    plt.plot(epochs, losses.get(\"val\", []), label=\"Val Loss\")\n    plt.xlabel(\"Epoch\")\n    plt.ylabel(\"MSE Loss\")\n    plt.title(\"Training vs Validation Loss\\nDataset: Synthetic\")\n    plt.legend()\n    plt.savefig(os.path.join(working_dir, \"synthetic_losses_plot.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot2: {e}\")\n    plt.close()\n", null, "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n# Load experiment data\ntry:\n    experiment_data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    experiment_data = {}\n\n# Extract synthetic dataset entries\nsynthetic = experiment_data.get(\"synthetic\", {})\nmetrics = synthetic.get(\"metrics\", {})\nlosses = synthetic.get(\"losses\", {})\nepochs = range(1, len(metrics.get(\"train\", [])) + 1)\n\n# Plot training and validation error\ntry:\n    plt.figure()\n    plt.plot(epochs, metrics.get(\"train\", []), label=\"Train Error\")\n    plt.plot(epochs, metrics.get(\"val\", []), label=\"Val Error\")\n    plt.xlabel(\"Epoch\")\n    plt.ylabel(\"Relative Error\")\n    plt.title(\"Training vs Validation Error\\nDataset: Synthetic\")\n    plt.legend()\n    plt.savefig(os.path.join(working_dir, \"synthetic_metrics_plot.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot1: {e}\")\n    plt.close()\n\n# Plot training and validation losses\ntry:\n    plt.figure()\n    plt.plot(epochs, losses.get(\"train\", []), label=\"Train Loss\")\n    plt.plot(epochs, losses.get(\"val\", []), label=\"Val Loss\")\n    plt.xlabel(\"Epoch\")\n    plt.ylabel(\"MSE Loss\")\n    plt.title(\"Training vs Validation Loss\\nDataset: Synthetic\")\n    plt.legend()\n    plt.savefig(os.path.join(working_dir, \"synthetic_losses_plot.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot2: {e}\")\n    plt.close()\n", "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n# Load experiment data\ntry:\n    experiment_data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    experiment_data = {}\n\n# Extract synthetic dataset entries\nsynthetic = experiment_data.get(\"synthetic\", {})\nmetrics = synthetic.get(\"metrics\", {})\nlosses = synthetic.get(\"losses\", {})\nepochs = range(1, len(metrics.get(\"train\", [])) + 1)\n\n# Plot training and validation error\ntry:\n    plt.figure()\n    plt.plot(epochs, metrics.get(\"train\", []), label=\"Train Error\")\n    plt.plot(epochs, metrics.get(\"val\", []), label=\"Val Error\")\n    plt.xlabel(\"Epoch\")\n    plt.ylabel(\"Relative Error\")\n    plt.title(\"Training vs Validation Error\\nDataset: Synthetic\")\n    plt.legend()\n    plt.savefig(os.path.join(working_dir, \"synthetic_metrics_plot.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot1: {e}\")\n    plt.close()\n\n# Plot training and validation losses\ntry:\n    plt.figure()\n    plt.plot(epochs, losses.get(\"train\", []), label=\"Train Loss\")\n    plt.plot(epochs, losses.get(\"val\", []), label=\"Val Loss\")\n    plt.xlabel(\"Epoch\")\n    plt.ylabel(\"MSE Loss\")\n    plt.title(\"Training vs Validation Loss\\nDataset: Synthetic\")\n    plt.legend()\n    plt.savefig(os.path.join(working_dir, \"synthetic_losses_plot.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot2: {e}\")\n    plt.close()\n", "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n# Load experiment data\ntry:\n    experiment_data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    experiment_data = {}\n\n# Extract synthetic dataset entries\nsynthetic = experiment_data.get(\"synthetic\", {})\nmetrics = synthetic.get(\"metrics\", {})\nlosses = synthetic.get(\"losses\", {})\nepochs = range(1, len(metrics.get(\"train\", [])) + 1)\n\n# Plot training and validation error\ntry:\n    plt.figure()\n    plt.plot(epochs, metrics.get(\"train\", []), label=\"Train Error\")\n    plt.plot(epochs, metrics.get(\"val\", []), label=\"Val Error\")\n    plt.xlabel(\"Epoch\")\n    plt.ylabel(\"Relative Error\")\n    plt.title(\"Training vs Validation Error\\nDataset: Synthetic\")\n    plt.legend()\n    plt.savefig(os.path.join(working_dir, \"synthetic_metrics_plot.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot1: {e}\")\n    plt.close()\n\n# Plot training and validation losses\ntry:\n    plt.figure()\n    plt.plot(epochs, losses.get(\"train\", []), label=\"Train Loss\")\n    plt.plot(epochs, losses.get(\"val\", []), label=\"Val Loss\")\n    plt.xlabel(\"Epoch\")\n    plt.ylabel(\"MSE Loss\")\n    plt.title(\"Training vs Validation Loss\\nDataset: Synthetic\")\n    plt.legend()\n    plt.savefig(os.path.join(working_dir, \"synthetic_losses_plot.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating plot2: {e}\")\n    plt.close()\n", "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n# Paths to the three experiment data files\nexperiment_data_path_list = [\n    \"experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_91521c88da8347558b30b105ff951d99_proc_103091/experiment_data.npy\",\n    \"experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_62e80975b1b143ad83eda1f52d796f6a_proc_103092/experiment_data.npy\",\n    \"experiments/2025-06-07_19-09-39_weight_primitives_attempt_0/logs/0-run/experiment_results/experiment_08ecc5ccc08e4289a6dd7b6b1701b055_proc_103093/experiment_data.npy\",\n]\n\n# Load all experiments\nall_experiment_data = []\nfor path in experiment_data_path_list:\n    try:\n        data = np.load(\n            os.path.join(os.getenv(\"AI_SCIENTIST_ROOT\"), path), allow_pickle=True\n        ).item()\n        all_experiment_data.append(data)\n    except Exception as e:\n        print(f\"Error loading experiment data from {path}: {e}\")\n\n# Identify all dataset names\ndataset_names = set()\nfor ed in all_experiment_data:\n    dataset_names.update(ed.keys())\n\n# Aggregate and plot for each dataset\nfor ds in dataset_names:\n    # Collect metrics across runs\n    metrics_train_list = []\n    metrics_val_list = []\n    losses_train_list = []\n    losses_val_list = []\n    for ed in all_experiment_data:\n        ds_data = ed.get(ds, {})\n        metrics = ds_data.get(\"metrics\", {})\n        losses = ds_data.get(\"losses\", {})\n        if metrics.get(\"train\") and metrics.get(\"val\"):\n            metrics_train_list.append(metrics[\"train\"])\n            metrics_val_list.append(metrics[\"val\"])\n        if losses.get(\"train\") and losses.get(\"val\"):\n            losses_train_list.append(losses[\"train\"])\n            losses_val_list.append(losses[\"val\"])\n\n    # Plot aggregated metrics with mean \u00b1 SE\n    if metrics_train_list:\n        n_epochs = min(len(x) for x in metrics_train_list)\n        train_arr = np.array([x[:n_epochs] for x in metrics_train_list])\n        val_arr = np.array([x[:n_epochs] for x in metrics_val_list])\n        epochs = np.arange(1, n_epochs + 1)\n        mean_train = train_arr.mean(axis=0)\n        se_train = train_arr.std(axis=0, ddof=1) / np.sqrt(train_arr.shape[0])\n        mean_val = val_arr.mean(axis=0)\n        se_val = val_arr.std(axis=0, ddof=1) / np.sqrt(val_arr.shape[0])\n\n        # Print final epoch summary\n        print(\n            f\"{ds} final metrics (Epoch {n_epochs}) - \"\n            f\"Train Error Mean\u00b1SE: {mean_train[-1]:.4f}\u00b1{se_train[-1]:.4f}, \"\n            f\"Val Error Mean\u00b1SE: {mean_val[-1]:.4f}\u00b1{se_val[-1]:.4f}\"\n        )\n\n        try:\n            plt.figure()\n            plt.errorbar(\n                epochs, mean_train, yerr=se_train, label=\"Train Error Mean \u00b1 SE\"\n            )\n            plt.errorbar(epochs, mean_val, yerr=se_val, label=\"Val Error Mean \u00b1 SE\")\n            plt.xlabel(\"Epoch\")\n            plt.ylabel(\"Relative Error\")\n            plt.title(f\"Training vs Validation Error (Mean \u00b1 SE)\\nDataset: {ds}\")\n            plt.legend()\n            plt.savefig(os.path.join(working_dir, f\"{ds}_metrics_mean_se.png\"))\n            plt.close()\n        except Exception as e:\n            print(f\"Error creating metrics plot for {ds}: {e}\")\n            plt.close()\n\n    # Plot aggregated losses with mean \u00b1 SE\n    if losses_train_list:\n        n_epochs = min(len(x) for x in losses_train_list)\n        train_loss_arr = np.array([x[:n_epochs] for x in losses_train_list])\n        val_loss_arr = np.array([x[:n_epochs] for x in losses_val_list])\n        epochs = np.arange(1, n_epochs + 1)\n        mean_train_loss = train_loss_arr.mean(axis=0)\n        se_train_loss = train_loss_arr.std(axis=0, ddof=1) / np.sqrt(\n            train_loss_arr.shape[0]\n        )\n        mean_val_loss = val_loss_arr.mean(axis=0)\n        se_val_loss = val_loss_arr.std(axis=0, ddof=1) / np.sqrt(val_loss_arr.shape[0])\n\n        # Print final epoch summary\n        print(\n            f\"{ds} final losses (Epoch {n_epochs}) - \"\n            f\"Train Loss Mean\u00b1SE: {mean_train_loss[-1]:.4f}\u00b1{se_train_loss[-1]:.4f}, \"\n            f\"Val Loss Mean\u00b1SE: {mean_val_loss[-1]:.4f}\u00b1{se_val_loss[-1]:.4f}\"\n        )\n\n        try:\n            plt.figure()\n            plt.errorbar(\n                epochs,\n                mean_train_loss,\n                yerr=se_train_loss,\n                label=\"Train Loss Mean \u00b1 SE\",\n            )\n            plt.errorbar(\n                epochs, mean_val_loss, yerr=se_val_loss, label=\"Val Loss Mean \u00b1 SE\"\n            )\n            plt.xlabel(\"Epoch\")\n            plt.ylabel(\"MSE Loss\")\n            plt.title(f\"Training vs Validation Loss (Mean \u00b1 SE)\\nDataset: {ds}\")\n            plt.legend()\n            plt.savefig(os.path.join(working_dir, f\"{ds}_losses_mean_se.png\"))\n            plt.close()\n        except Exception as e:\n            print(f\"Error creating losses plot for {ds}: {e}\")\n            plt.close()\n"], "plot_plan": [null, null, null, null, "I will load the saved experiment data from the working directory and extract the synthetic dataset metrics and losses. I will generate two separate plots: one for training vs. validation error and another for training vs. validation reconstruction loss over epochs. Each plot will be created in its own try-except block to handle potential errors gracefully. The figures will include clear titles and subtitles specifying the dataset type, axis labels, and legends. Plots will be saved to the working directory with descriptive filenames that include the dataset name and plot type. After saving, each figure will be closed to free resources. If the data file fails to load or plotting fails, appropriate error messages will be printed.", null, null, null, null, null], "ablation_name": [null, null, null, null, null, null, null, null, null, null], "hyperparam_name": [null, null, null, null, null, null, null, null, null, null], "is_seed_node": [false, false, false, false, false, false, true, true, true, true], "is_seed_agg_node": [false, false, false, false, false, false, false, false, false, true], "parse_metrics_plan": ["", "", "", "I will write a short script that constructs the working directory path, loads\nthe saved NumPy experiment data with pickle support, and iterates over each\ndataset entry. For each dataset, it extracts the final epoch\u2019s reconstruction\nerrors and losses, then prints them with explicit labels like \u201ctrain\nreconstruction error\u201d and \u201cvalidation loss.\u201d The code runs immediately at the\nglobal scope without any `if __name__ == \"__main__\":` guard.", "The script first builds the path to the working folder and loads the saved\nexperiment data as a Python dictionary. It then iterates over each dataset\nentry, extracting the lists of relative error metrics and reconstruction MSE\nlosses. For each dataset, it prints the dataset name followed by the final\ntraining and validation relative errors, as well as the final training and\nvalidation reconstruction MSEs with descriptive labels. All code runs in global\nscope so it executes immediately when the file is run.", "Below is a script that loads the saved experiment data from the working\ndirectory, extracts the final values for each metric, and prints them with clear\ndataset and metric labels. It reports the final training and validation\nreconstruction errors for both conv1 and conv2, the final global relative weight\nreconstruction error, and the test accuracy plus relative reconstruction error\nfor the reconstructed model. The code runs immediately at the global scope\nwithout any `if __name__ == \"__main__\":` guard.", "The script first builds the path to the working folder and loads the saved\nexperiment data as a Python dictionary. It then iterates over each dataset\nentry, extracting the lists of relative error metrics and reconstruction MSE\nlosses. For each dataset, it prints the dataset name followed by the final\ntraining and validation relative errors, as well as the final training and\nvalidation reconstruction MSEs with descriptive labels. All code runs in global\nscope so it executes immediately when the file is run.", "The script first builds the path to the working folder and loads the saved\nexperiment data as a Python dictionary. It then iterates over each dataset\nentry, extracting the lists of relative error metrics and reconstruction MSE\nlosses. For each dataset, it prints the dataset name followed by the final\ntraining and validation relative errors, as well as the final training and\nvalidation reconstruction MSEs with descriptive labels. All code runs in global\nscope so it executes immediately when the file is run.", "The script first builds the path to the working folder and loads the saved\nexperiment data as a Python dictionary. It then iterates over each dataset\nentry, extracting the lists of relative error metrics and reconstruction MSE\nlosses. For each dataset, it prints the dataset name followed by the final\ntraining and validation relative errors, as well as the final training and\nvalidation reconstruction MSEs with descriptive labels. All code runs in global\nscope so it executes immediately when the file is run.", ""], "parse_metrics_code": ["", "", "", "import os\nimport numpy as np\n\n# Define working directory and load experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\nfile_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(file_path, allow_pickle=True).item()\n\n# Iterate over each dataset and print final metrics with clear labels\nfor dataset_name, dataset in experiment_data.items():\n    train_errors = dataset[\"metrics\"][\"train\"]\n    val_errors = dataset[\"metrics\"][\"val\"]\n    train_losses = dataset[\"losses\"][\"train\"]\n    val_losses = dataset[\"losses\"][\"val\"]\n\n    final_train_error = train_errors[-1]\n    final_val_error = val_errors[-1]\n    final_train_loss = train_losses[-1]\n    final_val_loss = val_losses[-1]\n\n    print(f\"Dataset: {dataset_name}\")\n    print(f\"Final train reconstruction error: {final_train_error:.4f}\")\n    print(f\"Final validation reconstruction error: {final_val_error:.4f}\")\n    print(f\"Final train loss: {final_train_loss:.4f}\")\n    print(f\"Final validation loss: {final_val_loss:.4f}\")\n", "import os\nimport numpy as np\n\n# Locate and load the saved experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\ndata_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(data_path, allow_pickle=True).item()\n\n# Iterate through each dataset and print the final metrics\nfor dataset_name, dataset_info in experiment_data.items():\n    metrics = dataset_info[\"metrics\"]\n    losses = dataset_info[\"losses\"]\n\n    final_train_rel_err = metrics[\"train\"][-1]\n    final_val_rel_err = metrics[\"val\"][-1]\n    final_train_mse = losses[\"train\"][-1]\n    final_val_mse = losses[\"val\"][-1]\n\n    print(f\"Dataset: {dataset_name}\")\n    print(f\"final training relative error: {final_train_rel_err:.4f}\")\n    print(f\"final validation relative error: {final_val_rel_err:.4f}\")\n    print(f\"final training reconstruction MSE: {final_train_mse:.4f}\")\n    print(f\"final validation reconstruction MSE: {final_val_mse:.4f}\")\n", "import os\nimport numpy as np\n\n# Load experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\ndata_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(data_path, allow_pickle=True).item()\n\n# conv1 metrics\nconv1_metrics = experiment_data[\"conv1\"][\"metrics\"]\nfinal_train_err_c1 = conv1_metrics[\"train\"][-1]\nfinal_val_err_c1 = conv1_metrics[\"val\"][-1]\nprint(\"Dataset: conv1\")\nprint(f\"final training reconstruction error: {final_train_err_c1:.4f}\")\nprint(f\"final validation reconstruction error: {final_val_err_c1:.4f}\")\n\n# conv2 metrics\nconv2_metrics = experiment_data[\"conv2\"][\"metrics\"]\nfinal_train_err_c2 = conv2_metrics[\"train\"][-1]\nfinal_val_err_c2 = conv2_metrics[\"val\"][-1]\nprint(\"Dataset: conv2\")\nprint(f\"final training reconstruction error: {final_train_err_c2:.4f}\")\nprint(f\"final validation reconstruction error: {final_val_err_c2:.4f}\")\n\n# global metric\nglobal_errors = experiment_data[\"global\"][\"relative_weight_rec_error\"]\nfinal_global_err = global_errors[-1]\nprint(\"Dataset: global\")\nprint(f\"final global relative weight reconstruction error: {final_global_err:.4f}\")\n\n# reconstructed model metrics\nrecon_metrics = experiment_data[\"reconstructed_model\"][\"metrics\"]\nrecon_losses = experiment_data[\"reconstructed_model\"][\"losses\"]\nfinal_test_acc = recon_metrics[\"test_acc\"][-1]\nfinal_rel_rec_err = recon_losses[\"relative_reconstruction_error\"][-1]\nprint(\"Dataset: reconstructed_model\")\nprint(f\"final test accuracy: {final_test_acc:.4f}\")\nprint(f\"final relative reconstruction error: {final_rel_rec_err:.4f}\")\n", "import os\nimport numpy as np\n\n# Locate and load the saved experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\ndata_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(data_path, allow_pickle=True).item()\n\n# Iterate through each dataset and print the final metrics\nfor dataset_name, dataset_info in experiment_data.items():\n    metrics = dataset_info[\"metrics\"]\n    losses = dataset_info[\"losses\"]\n\n    final_train_rel_err = metrics[\"train\"][-1]\n    final_val_rel_err = metrics[\"val\"][-1]\n    final_train_mse = losses[\"train\"][-1]\n    final_val_mse = losses[\"val\"][-1]\n\n    print(f\"Dataset: {dataset_name}\")\n    print(f\"final training relative error: {final_train_rel_err:.4f}\")\n    print(f\"final validation relative error: {final_val_rel_err:.4f}\")\n    print(f\"final training reconstruction MSE: {final_train_mse:.4f}\")\n    print(f\"final validation reconstruction MSE: {final_val_mse:.4f}\")\n", "import os\nimport numpy as np\n\n# Locate and load the saved experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\ndata_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(data_path, allow_pickle=True).item()\n\n# Iterate through each dataset and print the final metrics\nfor dataset_name, dataset_info in experiment_data.items():\n    metrics = dataset_info[\"metrics\"]\n    losses = dataset_info[\"losses\"]\n\n    final_train_rel_err = metrics[\"train\"][-1]\n    final_val_rel_err = metrics[\"val\"][-1]\n    final_train_mse = losses[\"train\"][-1]\n    final_val_mse = losses[\"val\"][-1]\n\n    print(f\"Dataset: {dataset_name}\")\n    print(f\"final training relative error: {final_train_rel_err:.4f}\")\n    print(f\"final validation relative error: {final_val_rel_err:.4f}\")\n    print(f\"final training reconstruction MSE: {final_train_mse:.4f}\")\n    print(f\"final validation reconstruction MSE: {final_val_mse:.4f}\")\n", "import os\nimport numpy as np\n\n# Locate and load the saved experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\ndata_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(data_path, allow_pickle=True).item()\n\n# Iterate through each dataset and print the final metrics\nfor dataset_name, dataset_info in experiment_data.items():\n    metrics = dataset_info[\"metrics\"]\n    losses = dataset_info[\"losses\"]\n\n    final_train_rel_err = metrics[\"train\"][-1]\n    final_val_rel_err = metrics[\"val\"][-1]\n    final_train_mse = losses[\"train\"][-1]\n    final_val_mse = losses[\"val\"][-1]\n\n    print(f\"Dataset: {dataset_name}\")\n    print(f\"final training relative error: {final_train_rel_err:.4f}\")\n    print(f\"final validation relative error: {final_val_rel_err:.4f}\")\n    print(f\"final training reconstruction MSE: {final_train_mse:.4f}\")\n    print(f\"final validation reconstruction MSE: {final_val_mse:.4f}\")\n", ""], "parse_term_out": ["", "", "", "['Dataset: synthetic_weight_dataset', '\\n', 'Final train reconstruction error:\n0.0105', '\\n', 'Final validation reconstruction error: 1.0216', '\\n', 'Final\ntrain loss: 0.0001', '\\n', 'Final validation loss: 1.0252', '\\n', 'Execution\ntime: a moment seconds (time limit is an hour).']", "['Dataset: synthetic', '\\n', 'final training relative error: 21.2870', '\\n',\n'final validation relative error: 0.9786', '\\n', 'final training reconstruction\nMSE: 8.8067', '\\n', 'final validation reconstruction MSE: 2.9568', '\\n',\n'Execution time: a moment seconds (time limit is an hour).']", "['Dataset: conv1', '\\n', 'final training reconstruction error: 0.5379', '\\n',\n'final validation reconstruction error: 0.5474', '\\n', 'Dataset: conv2', '\\n',\n'final training reconstruction error: 0.7300', '\\n', 'final validation\nreconstruction error: 0.7322', '\\n', 'Dataset: global', '\\n', 'final global\nrelative weight reconstruction error: 0.6876', '\\n', 'Dataset:\nreconstructed_model', '\\n', 'final test accuracy: 0.1135', '\\n', 'final relative\nreconstruction error: 1.1480', '\\n', 'Execution time: a moment seconds (time\nlimit is an hour).']", "['Dataset: synthetic', '\\n', 'final training relative error: 21.2870', '\\n',\n'final validation relative error: 0.9786', '\\n', 'final training reconstruction\nMSE: 8.8067', '\\n', 'final validation reconstruction MSE: 2.9568', '\\n',\n'Execution time: a moment seconds (time limit is an hour).']", "['Dataset: synthetic', '\\n', 'final training relative error: 21.2870', '\\n',\n'final validation relative error: 0.9786', '\\n', 'final training reconstruction\nMSE: 8.8067', '\\n', 'final validation reconstruction MSE: 2.9568', '\\n',\n'Execution time: a moment seconds (time limit is an hour).']", "['Dataset: synthetic', '\\n', 'final training relative error: 21.2870', '\\n',\n'final validation relative error: 0.9786', '\\n', 'final training reconstruction\nMSE: 8.8067', '\\n', 'final validation reconstruction MSE: 2.9568', '\\n',\n'Execution time: a moment seconds (time limit is an hour).']", ""], "parse_exc_type": [null, null, null, null, null, null, null, null, null, null], "parse_exc_info": [null, null, null, null, null, null, null, null, null, null], "parse_exc_stack": [null, null, null, null, null, null, null, null, null, null], "completed_stages": ["Stage_1"]};
+
+// Add log directory path and stage info to the tree data
+treeStructData.log_dir_path = window.location.pathname.split('/').slice(0, -1).join('/');
+treeStructData.current_stage = window.location.pathname.includes('stage_')
+  ? window.location.pathname.split('stage_')[1].split('/')[0]
+  : 'Stage_1';
+
+// Initialize background color
+window.bgColCurrent = bgCol;
+
+// Function to set background color that can be called from the console
+function setBackgroundColor(color) {
+  // Update the global color
+  updateBackgroundColor(color);
+
+  // Refresh the current sketch to apply the new background color
+  if (currentStage) {
+    startSketch(currentStage);
+  }
+}
+
+// Load all stage data and initialize the visualization
+loadAllStageData(treeStructData);
+
+    </script>
+    <title>AI Scientist-v2 Visualization</title>
+    <style>
+      body,
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background-color: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+      #canvas-container {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 40vw;
+        height: 100vh;
+        background-color: inherit;
+        padding-top: 40px;
+      }
+      canvas {
+        float: left;
+        height: 100vh;
+        width: 100vw;
+      }
+      #text-container {
+        float: right;
+        height: 100vh;
+        width: 50vw;
+        background-color: #282c34;
+        overflow: auto;
+      }
+      #plan {
+        /* border-left: 2px solid #282c34; */
+        background-color: #282c34;
+        color: #f2f0e7;
+        min-height: 5rem;
+        padding: 1em 0 1em 1em;
+      }
+      #plot_plan {
+        background-color: #282c34;
+        color: #f2f0e7;
+        min-height: 5rem;
+        padding: 1em 0 1em 1em;
+        white-space: pre-wrap;
+      }
+      #exec_time_feedback {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #282c34;
+        border-left: 3px solid #ff5555;
+        color: #f2f0e7;
+      }
+      #exec_time {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #282c34;
+        border-left: 3px solid #ff5555;
+        color: #f2f0e7;
+      }
+      #exc_info {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #2c1f1f;
+        border-left: 3px solid #ff5555;
+        color: #f2f0e7;
+      }
+      #metrics {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #282c34;
+        color: #f2f0e7;
+      }
+      #vlm_feedback {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #1f2c2f;
+        color: #f2f0e7;
+        border-left: 3px solid #55ff55;
+      }
+      #vlm_feedback p {
+        margin: 0.5em 0;
+        white-space: pre-wrap;
+      }
+      .datasets_successfully_tested {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #282c34;
+        color: #f2f0e7;
+        border-left: 3px solid #55ff55;
+      }
+      .plots-container {
+        float: right;
+        width: 50vw;
+        padding: 1rem;
+        background-color: #282c34;
+        margin-top: 1rem;
+      }
+
+      .plot-item {
+        flex: 1 1 300px;
+        max-width: 100%;
+        margin-bottom: 1rem;
+        white-space: pre-wrap;
+      }
+
+      .plot-item img {
+        width: 100%;
+        height: auto;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: block;
+      }
+
+      .metric-group {
+        margin-bottom: 20px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .metric-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      .metric-table th,
+      .metric-table td {
+        padding: 8px;
+        text-align: left;
+        border: 1px solid #ddd;
+      }
+
+      .metric-table th {
+        background-color: #363b44;
+      }
+
+      /* Styles for tabs */
+      .tabs-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 49vw;
+        background-color: #000000;
+        z-index: 10;
+        display: flex;
+        padding: 0;
+      }
+
+      .tab {
+        cursor: pointer;
+        padding: 10px 15px;
+        background-color: #333;
+        color: #f2f0e7;
+        border: none;
+        outline: none;
+        transition: background-color 0.3s;
+        flex: 1;
+        text-align: center;
+      }
+
+      .tab:hover {
+        background-color: #444;
+      }
+
+      .tab.active {
+        background-color: #4c76af;
+        font-weight: bold;
+      }
+
+      .tab.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background-color: #282c34;
+      }
+
+      .tab-content {
+        display: none;
+        padding-top: 40px; /* Space for tabs */
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      .stage-info {
+        padding: 10px;
+        background-color: #282c34;
+        color: #f2f0e7;
+        margin-bottom: 10px;
+        font-size: 0.9em;
+      }
+
+      .stage-status {
+        display: inline-block;
+        padding: 3px 6px;
+        border-radius: 3px;
+        margin-left: 8px;
+        font-size: 0.8em;
+      }
+
+      .stage-status.completed {
+        background-color: #4caf50;
+      }
+
+      .stage-status.in-progress {
+        background-color: #2196f3;
+      }
+
+      .stage-status.not-started {
+        background-color: #9e9e9e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="tabs-container" id="stage-tabs">
+      <button class="tab" data-stage="Stage_1" onclick="selectStage('Stage_1')">Stage 1</button>
+      <button class="tab" data-stage="Stage_2" onclick="selectStage('Stage_2')">Stage 2</button>
+      <button class="tab" data-stage="Stage_3" onclick="selectStage('Stage_3')">Stage 3</button>
+      <button class="tab" data-stage="Stage_4" onclick="selectStage('Stage_4')">Stage 4</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <pre id="text-container">
+        <div id="stage-info" class="stage-info"></div>
+        <div id="plan"></div>
+        <hr>
+        <div id="exc_info"></div>
+        <hr>
+        <div id="exec_time"></div>
+        <hr>
+        <div id="exec_time_feedback"></div>
+        <hr>
+        <div id="metrics"></div>
+        <hr>
+        <div id="plot_plan"></div>
+        <hr>
+        <div class="plots-container" id="plots"></div>
+        <hr>
+        <div id="vlm_feedback"></div>
+        <hr>
+        <div id="datasets_successfully_tested"></div>
+        <hr>
+        <code id="code" class="language-python"></code>
+        <hr>
+        <code id="plot_code" class="language-python"></code>
+    </pre>
+  </body>
+</html>

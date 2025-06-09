@@ -1,0 +1,80 @@
+% add near top of preamble, after loading packages
+% ─────────────────────────────────────────────
+%% tighten spacing around floats and captions
+\setlength{\textfloatsep}{8pt plus 1pt minus 1pt}
+\setlength{\intextsep}{8pt plus 1pt minus 1pt}
+\captionsetup{font=small,skip=4pt}
+% optional: slightly tighter margins (if allowed by the style)
+%\addtolength{\textheight}{1ex}
+
+% … rest of your preamble, then document …
+
+\begin{document}
+
+\title{Catchy Title: When Your \\Fancy Model Breaks in Production}
+\author{…}
+\maketitle
+
+\begin{abstract}
+We present a real-world case where a state-of-the-art deep model collapses under slight input drift, uncovering a deployment pitfall often glossed over in the literature. We analyze why this occurs, show that standard domain-adaptation fixes only partially remedy the issue, and discuss broader lessons for reliable real-world ML.  % tightened wording
+\end{abstract}
+
+\section{Introduction}
+Modern deep nets often boast near-perfect performance \citep{Smith2024,Lee2023}, but bridging from lab to production remains fraught with subtle failure modes. In this work we demonstrate a concrete example: a vision transformer that fails catastrophically on minor color shifts in streaming data. We (1) diagnose the root cause via layer-wise analysis; (2) evaluate common fixes (e.g.\ fine-tuning, batch-norm recalibration) and show only partial success; and (3) distill guidelines to help practitioners anticipate and avoid similar breakdowns.  % in-lined contributions
+
+\section{Related Work}
+Numerous studies discuss domain shift \citep{Ganin2016,Tsai2022}, robust training \citep{Madry2018}, and transfer learning \citep{Pan2010}. However, most benchmarks consider synthetic shifts or small perturbations, not the streaming color-distribution drift we observe in practice. Unlike \citet{Ganin2016} who assume access to target labels, we target fully unsupervised scenarios.
+
+% Remove blank or overly short Background section entirely
+%\section{Background}
+%… 
+
+\section{Problem Setup}
+We train a vision transformer on CIFAR-10 with standard augmentations \citep{Krizhevsky2009}. In deployment, images undergo color-profile changes sampled from 10 real cameras. Formally, let $x\sim p_\text{train}$ and $x'\sim p_\text{deploy}$ differ by a color transform $T$. We measure accuracy drop $\Delta = \mathrm{Acc}(p_\text{train}) - \mathrm{Acc}(p_\text{deploy})$.
+
+\section{Experiments}
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.45\textwidth]{drift_accuracy.png}
+  \includegraphics[width=0.45\textwidth]{feature_shift.png}
+  \caption{(Left) Accuracy vs.\ color drift severity. (Right) PCA of penultimate features for train vs.\ deploy data.}
+  \label{fig:drift}
+\end{figure}
+
+We evaluate three adaptation strategies: (a) naive fine‐tuning on a small unlabeled batch via pseudo‐labels; (b) batch‐norm recalibration per camera; (c) contrastive domain‐invariant pretraining. Results in Table~\ref{tab:results} show none recover full accuracy, with best method still 8\% below in-domain.
+
+\begin{table}[t]
+\centering\footnotesize
+\begin{tabular}{lcc}
+\toprule
+Method & In‐domain Acc & Deployment Acc \\
+\midrule
+None (baseline) & 94.1 & 72.3 \\
+Fine-tune (pseudo) & 93.5 & 82.0 \\
+BN‐recalib & 94.0 & 83.4 \\
+Contrastive pretrain & 93.8 & 86.1 \\
+\bottomrule
+\end{tabular}
+\caption{Accuracy under color drift.}
+\label{tab:results}
+\end{table}
+
+\section{Discussion}
+We pinpointed two culprits: (i) collapsed feature‐covariances in early layers, (ii) overconfident pseudo-labels that reinforce drift. While BN recalibration helps, it cannot fully re‐align deep feature spaces, and pseudo‐label fine‐tuning risks confirmation bias.
+
+\section{Conclusion}
+Minor real‐world shifts can still break today's best models. Our analysis suggests practitioners should monitor feature distributions online and consider lightweight unsupervised domain adaptation before deployment. Future work could explore continual learning strategies that adapt more robustly to streaming drift.
+
+% references as usual
+\bibliographystyle{iclr2025_conference}
+\begin{filecontents}{references.bib}
+@inproceedings{Smith2024, …}
+@inproceedings{Lee2023, …}
+@article{Ganin2016, …}
+@article{Tsai2022, …}
+@inproceedings{Madry2018, …}
+@article{Pan2010, …}
+@inproceedings{Krizhevsky2009, …}
+\end{filecontents}
+
+\end{document}

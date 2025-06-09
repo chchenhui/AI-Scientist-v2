@@ -1,0 +1,27 @@
+% ===== BEGIN MINIMAL PAGE-SQUEEZE PATCH =====
+% 1. tighter section headings
+\usepackage{titlesec}
+\titlespacing\section{0pt}{1.5ex plus .2ex minus .2ex}{0.8ex plus .2ex minus .2ex}
+\titlespacing\subsection{0pt}{1.2ex plus .2ex minus .2ex}{0.6ex plus .2ex minus .2ex}
+
+% 2. compact itemize/enumerate
+\usepackage{enumitem}
+\setlist[itemize,enumerate]{topsep=1pt, partopsep=0pt, parsep=0pt, itemsep=1pt,leftmargin=*}
+
+% 3. tighter float spacing
+\setlength{\floatsep}{6pt plus 1pt minus 1pt}
+\setlength{\textfloatsep}{8pt plus 1pt minus 1pt}
+\setlength{\intextsep}{6pt plus 1pt minus 1pt}
+
+% 4. caption font and skip
+\usepackage[font=small,skip=0pt]{caption}
+\captionsetup[table]{skip=0.5\baselineskip}
+\captionsetup[figure]{skip=0.5\baselineskip}
+
+% 5. slightly reduce space around paragraphs
+\setlength{\parskip}{0.5\baselineskip}
+\setlength{\parindent}{1em}
+
+% 6. enable tighter lists in algorithms (if using algorithm2e)
+\AtBeginEnvironment{algorithm}{\setlength{\intextsep}{4pt}}
+% =====  END MINIMAL PAGE-SQUEEZE PATCH  =====

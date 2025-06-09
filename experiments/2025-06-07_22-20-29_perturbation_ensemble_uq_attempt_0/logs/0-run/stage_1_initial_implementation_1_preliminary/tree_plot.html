@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Check if we're running under Live Server
+      if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+          let lastModified = '';
+
+          // Check for file changes every second
+          setInterval(async () => {
+              try {
+                  const response = await fetch(window.location.href, { method: 'HEAD' });
+                  // get a timestamp that shows when the file was last changed
+                  const currentModified = response.headers.get('last-modified');
+
+                  if (lastModified && lastModified !== currentModified) {
+                      window.location.reload();
+                  }
+
+                  lastModified = currentModified;
+              } catch (e) {
+                  console.error('Error checking for updates:', e);
+              }
+          }, 1000);
+      }
+  </script>
+    <script
+      id="p5scripttag"
+      src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"
+      integrity="sha512-uaz5GpnQoE6t5echKlX8P52czvsIGgLPcvlzfvRubLZ1Hp8JemUDnbUiAahbVtPb+jUVrNETuXvAhDDF/N3M4w=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+
+    <script>
+      const bgCol = "#FFFFFF";
+const accentCol = "#1a439e";
+
+hljs.initHighlightingOnLoad();
+
+// Function to update background color globally
+function updateBackgroundColor(color) {
+  // Update the JS variable
+  window.bgColCurrent = color;
+
+  // Update body background
+  document.body.style.backgroundColor = color;
+
+  // Update canvas container background
+  const canvasContainer = document.getElementById('canvas-container');
+  if (canvasContainer) {
+    canvasContainer.style.backgroundColor = color;
+  }
+}
+
+// Store tree data for each stage
+const stageData = {
+  Stage_1: null,
+  Stage_2: null,
+  Stage_3: null,
+  Stage_4: null
+};
+
+// Keep track of current selected stage
+let currentStage = null;
+let currentSketch = null;
+let availableStages = [];
+
+// Class definitions for nodes and edges
+class Node {
+  constructor(x, y, id, isRoot = false) {
+    this.x = x;
+    this.y = y;
+    this.id = id;
+    this.visible = isRoot; // Only root nodes are visible initially
+    this.appearProgress = 0;
+    this.popEffect = 0;
+    this.selected = false;
+    this.isRootNode = isRoot;
+  }
+
+  update() {
+    if (this.visible) {
+      // Handle the main appearance animation
+      if (this.appearProgress < 1) {
+        this.appearProgress += 0.06;
+
+        // When we reach full size, trigger the pop effect
+        if (this.appearProgress >= 1) {
+          this.appearProgress = 1; // Cap at 1
+          this.popEffect = 1; // Start the pop effect
+        }
+      }
+
+      // Handle the pop effect animation
+      if (this.popEffect > 0) {
+        this.popEffect -= 0.15; // Control how quickly it shrinks back
+        if (this.popEffect < 0) this.popEffect = 0; // Don't go negative
+      }
+    }
+  }
+
+  startAnimation() {
+    this.visible = true;
+  }
+
+  color() {
+    if (this.selected) {
+      return accentCol; // Use the global accent color variable for selected node
+    }
+    return '#4263eb'; // Default blue color
+  }
+
+  render(p5) {
+    if (this.visible) {
+      const popBonus = this.popEffect * 0.1;
+      const nodeScale = p5.map(this.appearProgress, 0, 1, 0, 1) + popBonus;
+      const alpha = p5.map(this.appearProgress, 0, 1, 0, 255);
+
+      p5.push();
+      p5.translate(this.x, this.y);
+
+      // Shadow effect
+      p5.noStroke();
+      p5.rectMode(p5.CENTER);
+
+      for (let i = 1; i <= 4; i++) {
+        p5.fill(0, 0, 0, alpha * 0.06);
+        p5.rect(i, i, 30 * nodeScale, 30 * nodeScale, 10);
+      }
+
+      // Main square - use node's color with alpha
+      let nodeColor = p5.color(this.color());
+      nodeColor.setAlpha(alpha);
+      p5.fill(nodeColor);
+      p5.rect(0, 0, 30 * nodeScale, 30 * nodeScale, 10);
+
+      // Draw checkmark icon if the node is selected
+      if (this.selected && this.appearProgress >= 1) {
+        p5.stroke(255);
+        p5.strokeWeight(2 * nodeScale);
+        p5.noFill();
+        // Draw checkmark
+        p5.beginShape();
+        p5.vertex(-8, 0);
+        p5.vertex(-3, 5);
+        p5.vertex(8, -6);
+        p5.endShape();
+      }
+
+      p5.pop();
+    }
+  }
+
+  isMouseOver(p5) {
+    return this.visible &&
+           p5.mouseX > this.x - 15 &&
+           p5.mouseX < this.x + 15 &&
+           p5.mouseY > this.y - 15 &&
+           p5.mouseY < this.y + 15;
+  }
+
+  // Connect this node to a child node
+  child(childNode) {
+    // Create an edge from this node to the child
+    let isLeft = childNode.x < this.x;
+    let isRight = childNode.x > this.x;
+    let edge = new Edge(this, childNode, isLeft, isRight);
+    return edge;
+  }
+}
+
+class Edge {
+  constructor(parent, child, isLeft, isRight) {
+    this.parent = parent;
+    this.child = child;
+    this.isLeft = isLeft;
+    this.isRight = isRight;
+    this.progress = 0;
+
+    // Calculate the midpoint where branching occurs
+    this.midY = parent.y + (child.y - parent.y) * 0.6;
+
+    // Use the actual child x-coordinate
+    // This ensures the edge will connect directly to the child node
+    this.branchX = child.x;
+  }
+
+  update() {
+    if (this.parent.visible && this.progress < 1) {
+      this.progress += 0.01; // Adjust animation speed
+    }
+    if (this.progress >= 1) {
+      this.child.visible = true;
+    }
+  }
+
+  color() {
+    return this.child.color();
+  }
+
+  render(p5) {
+    if (!this.parent.visible) return;
+
+    // Calculate path lengths
+    const verticalDist1 = this.midY - this.parent.y;
+    const horizontalDist = Math.abs(this.branchX - this.parent.x);
+    const verticalDist2 = this.child.y - this.midY;
+    const totalLength = verticalDist1 + horizontalDist + verticalDist2;
+
+    // Calculate how much of each segment to draw
+    const currentLength = totalLength * this.progress;
+
+    p5.stroke(180, 190, 205);
+    p5.strokeWeight(1.5);
+    p5.noFill();
+
+    // Always draw the first vertical segment from parent
+    if (currentLength > 0) {
+      const firstSegmentLength = Math.min(currentLength, verticalDist1);
+      const currentMidY = p5.lerp(this.parent.y, this.midY, firstSegmentLength / verticalDist1);
+      p5.line(this.parent.x, this.parent.y, this.parent.x, currentMidY);
+    }
+
+    if (currentLength > verticalDist1) {
+      // Draw second segment (horizontal)
+      const secondSegmentLength = Math.min(currentLength - verticalDist1, horizontalDist);
+      const currentBranchX = p5.lerp(this.parent.x, this.branchX, secondSegmentLength / horizontalDist);
+      p5.line(this.parent.x, this.midY, currentBranchX, this.midY);
+
+      if (currentLength > verticalDist1 + horizontalDist) {
+        // Draw third segment (vertical to child)
+        const thirdSegmentLength = currentLength - verticalDist1 - horizontalDist;
+        const currentChildY = p5.lerp(this.midY, this.child.y, thirdSegmentLength / verticalDist2);
+        p5.line(this.branchX, this.midY, this.branchX, currentChildY);
+      }
+    }
+  }
+}
+
+// Create a modified sketch for each stage
+function createTreeSketch(stageId) {
+  return function(p5) {
+    let nodes = [];
+    let edges = [];
+    let treeData = stageData[stageId];
+
+    p5.setup = function() {
+      const canvas = p5.createCanvas(p5.windowWidth * 0.4, p5.windowHeight);
+      canvas.parent('canvas-container');
+      p5.smooth();
+      p5.frameRate(60);
+
+      if (treeData) {
+        createTreeFromData(treeData);
+      }
+    };
+
+    p5.windowResized = function() {
+      p5.resizeCanvas(p5.windowWidth * 0.4, p5.windowHeight);
+    };
+
+    function createTreeFromData(data) {
+      // Clear existing nodes and edges
+      nodes = [];
+      edges = [];
+
+      // Add defensive checks to prevent errors
+      if (!data || !data.layout || !Array.isArray(data.layout) || !data.edges || !Array.isArray(data.edges)) {
+        console.error("Invalid tree data format:", data);
+        return; // Exit if data structure is invalid
+      }
+
+      // Find all parent nodes in edges
+      const parentNodes = new Set();
+      for (const [parentId, childId] of data.edges) {
+        parentNodes.add(parentId);
+      }
+
+      // Create nodes
+      for (let i = 0; i < data.layout.length; i++) {
+        const [nx, ny] = data.layout[i];
+        // A node is a root if it's a parent and not a child in any edge
+        const isRoot = parentNodes.has(i) && data.edges.every(edge => edge[1] !== i);
+
+        const node = new Node(
+          nx * p5.width * 0.8 + p5.width * 0.1,
+          ny * p5.height * 0.8 + p5.height * 0.1,
+          i,
+          isRoot
+        );
+        nodes.push(node);
+      }
+
+      // If no root was found, make the first parent node visible
+      if (!nodes.some(node => node.visible) && parentNodes.size > 0) {
+        // Get the first parent node
+        const firstParentId = [...parentNodes][0];
+        if (nodes[firstParentId]) {
+          nodes[firstParentId].visible = true;
+        }
+      }
+
+      // Create edges
+      for (const [parentId, childId] of data.edges) {
+        const parent = nodes[parentId];
+        const child = nodes[childId];
+        if (parent && child) { // Verify both nodes exist
+          const isLeft = child.x < parent.x;
+          const isRight = child.x > parent.x;
+          edges.push(new Edge(parent, child, isLeft, isRight));
+        }
+      }
+
+      // Select the first node by default
+      if (nodes.length > 0) {
+        nodes[0].selected = true;
+        updateNodeInfo(0);
+      }
+    }
+
+    p5.draw = function() {
+      // Use the global background color if available, otherwise use the default bgCol
+      const currentBgColor = window.bgColCurrent || bgCol;
+      p5.background(currentBgColor);
+
+      // Update and render edges
+      for (const edge of edges) {
+        edge.update();
+        edge.render(p5);
+      }
+
+      // Update and render nodes
+      for (const node of nodes) {
+        node.update();
+        node.render(p5);
+      }
+
+      // Handle mouse hover
+      p5.cursor(p5.ARROW);
+      for (const node of nodes) {
+        if (node.isMouseOver(p5)) {
+          p5.cursor(p5.HAND);
+        }
+      }
+    };
+
+    p5.mousePressed = function() {
+      // Check if any node was clicked
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].visible && nodes[i].isMouseOver(p5)) {
+          // Deselect all nodes
+          nodes.forEach(n => n.selected = false);
+          // Select the clicked node
+          nodes[i].selected = true;
+          // Update the right panel with node info
+          updateNodeInfo(i);
+          break;
+        }
+      }
+    };
+
+    function updateNodeInfo(nodeIndex) {
+      if (treeData) {
+        setNodeInfo(
+          treeData.code[nodeIndex],
+          treeData.plan[nodeIndex],
+          treeData.plot_code?.[nodeIndex],
+          treeData.plot_plan?.[nodeIndex],
+          treeData.metrics?.[nodeIndex],
+          treeData.exc_type?.[nodeIndex] || '',
+          treeData.exc_info?.[nodeIndex]?.args?.[0] || '',
+          treeData.exc_stack?.[nodeIndex] || [],
+          treeData.plots?.[nodeIndex] || [],
+          treeData.plot_analyses?.[nodeIndex] || [],
+          treeData.vlm_feedback_summary?.[nodeIndex] || '',
+          treeData.datasets_successfully_tested?.[nodeIndex] || [],
+          treeData.exec_time_feedback?.[nodeIndex] || '',
+          treeData.exec_time?.[nodeIndex] || ''
+        );
+      }
+    }
+  };
+}
+
+// Start a new p5 sketch for the given stage
+function startSketch(stageId) {
+  if (currentSketch) {
+    currentSketch.remove();
+  }
+
+  if (stageData[stageId]) {
+    currentSketch = new p5(createTreeSketch(stageId));
+
+    // Update stage info
+    const stageNumber = stageId.split('_')[1];
+    let stageDesc = '';
+    switch(stageId) {
+      case 'Stage_1': stageDesc = 'Preliminary Investigation'; break;
+      case 'Stage_2': stageDesc = 'Baseline Tuning'; break;
+      case 'Stage_3': stageDesc = 'Research Agenda Execution'; break;
+      case 'Stage_4': stageDesc = 'Ablation Studies'; break;
+    }
+
+    document.getElementById('stage-info').innerHTML =
+      `<strong>Current Stage: ${stageNumber} - ${stageDesc}</strong>`;
+  }
+}
+
+// Handle tab selection
+function selectStage(stageId) {
+  if (!stageData[stageId] || !availableStages.includes(stageId)) {
+    return; // Don't allow selection of unavailable stages
+  }
+
+  // Update active tab styles
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.classList.remove('active');
+  });
+  document.querySelector(`.tab[data-stage="${stageId}"]`).classList.add('active');
+
+  // Start the new sketch
+  currentStage = stageId;
+  startSketch(stageId);
+}
+
+// Function to load the tree data for all stages
+async function loadAllStageData(baseTreeData) {
+  console.log("Loading stage data with base data:", baseTreeData);
+
+  // The base tree data is for the current stage
+  const currentStageId = baseTreeData.current_stage || 'Stage_1';
+
+  // Ensure base tree data is valid and has required properties
+  if (baseTreeData && baseTreeData.layout && baseTreeData.edges) {
+    stageData[currentStageId] = baseTreeData;
+    availableStages.push(currentStageId);
+    console.log(`Added current stage ${currentStageId} to available stages`);
+  } else {
+    console.warn(`Current stage ${currentStageId} data is invalid:`, baseTreeData);
+  }
+
+  // Use relative path to load other stage trees
+  const logDirPath = baseTreeData.log_dir_path || '.';
+  console.log("Log directory path:", logDirPath);
+
+  // Load data for each stage if available
+  const stageNames = ['Stage_1', 'Stage_2', 'Stage_3', 'Stage_4'];
+  const stageNames2actualNames = {
+    'Stage_1': 'stage_1_initial_implementation_1_preliminary',
+    'Stage_2': 'stage_2_baseline_tuning_1_first_attempt',
+    'Stage_3': 'stage_3_creative_research_1_first_attempt',
+    'Stage_4': 'stage_4_ablation_studies_1_first_attempt'
+    }
+
+  for (const stage of stageNames) {
+
+    if (baseTreeData.completed_stages && baseTreeData.completed_stages.includes(stage)) {
+      try {
+        console.log(`Attempting to load data for ${stage} from ${logDirPath}/${stageNames2actualNames[stage]}/tree_data.json`);
+        const response = await fetch(`${logDirPath}/${stageNames2actualNames[stage]}/tree_data.json`);
+
+        if (response.ok) {
+          const data = await response.json();
+
+          // Validate the loaded data
+          if (data && data.layout && data.edges) {
+            stageData[stage] = data;
+            availableStages.push(stage);
+            console.log(`Successfully loaded and validated data for ${stage}`);
+          } else {
+            console.warn(`Loaded data for ${stage} is invalid:`, data);
+          }
+        } else {
+          console.warn(`Failed to load data for ${stage} - HTTP status ${response.status}`);
+        }
+      } catch (error) {
+        console.error(`Error loading data for ${stage}:`, error);
+      }
+    } else {
+      console.log(`Skipping stage ${stage} - not in completed stages list:`, baseTreeData.completed_stages);
+    }
+  }
+
+  // Update tab visibility based on available stages
+  updateTabVisibility();
+
+  // Start with the first available stage
+  if (availableStages.length > 0) {
+    selectStage(availableStages[0]);
+  } else {
+    console.warn("No stages available to display");
+    // Display a message in the canvas area
+    document.getElementById('canvas-container').innerHTML =
+      '<div style="padding: 20px; color: #333; text-align: center;"><h3>No valid tree data available to display</h3></div>';
+  }
+}
+
+// Update tab visibility based on available stages
+function updateTabVisibility() {
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(tab => {
+    const stageId = tab.getAttribute('data-stage');
+    if (availableStages.includes(stageId)) {
+      tab.classList.remove('disabled');
+    } else {
+      tab.classList.add('disabled');
+    }
+  });
+}
+
+// Utility function to set the node info in the right panel
+const setNodeInfo = (code, plan, plot_code, plot_plan, metrics = null, exc_type = '', exc_info = '',
+    exc_stack = [], plots = [], plot_analyses = [], vlm_feedback_summary = '',
+    datasets_successfully_tested = [], exec_time_feedback = '', exec_time = '') => {
+  const codeElm = document.getElementById("code");
+  if (codeElm) {
+    if (code) {
+      codeElm.innerHTML = hljs.highlight(code, { language: "python" }).value;
+    } else {
+      codeElm.innerHTML = '<p>No code available</p>';
+    }
+  }
+
+  const planElm = document.getElementById("plan");
+  if (planElm) {
+    if (plan) {
+      planElm.innerHTML = hljs.highlight(plan, { language: "plaintext" }).value;
+    } else {
+      planElm.innerHTML = '<p>No plan available</p>';
+    }
+  }
+
+  const plot_codeElm = document.getElementById("plot_code");
+  if (plot_codeElm) {
+    if (plot_code) {
+      plot_codeElm.innerHTML = hljs.highlight(plot_code, { language: "python" }).value;
+    } else {
+      plot_codeElm.innerHTML = '<p>No plot code available</p>';
+    }
+  }
+
+  const plot_planElm = document.getElementById("plot_plan");
+  if (plot_planElm) {
+    if (plot_plan) {
+      plot_planElm.innerHTML = hljs.highlight(plot_plan, { language: "plaintext" }).value;
+    } else {
+      plot_planElm.innerHTML = '<p>No plot plan available</p>';
+    }
+  }
+
+  const metricsElm = document.getElementById("metrics");
+  if (metricsElm) {
+      let metricsContent = `<h3>Metrics:</h3>`;
+      if (metrics && metrics.metric_names) {
+          for (const metric of metrics.metric_names) {
+              metricsContent += `<div class="metric-group">`;
+              metricsContent += `<h4>${metric.metric_name}</h4>`;
+              metricsContent += `<p><strong>Description:</strong> ${metric.description || 'N/A'}</p>`;
+              metricsContent += `<p><strong>Optimization:</strong> ${metric.lower_is_better ? 'Minimize' : 'Maximize'}</p>`;
+
+              // Create table for dataset values
+              metricsContent += `<table class="metric-table">
+                  <tr>
+                      <th>Dataset</th>
+                      <th>Final Value</th>
+                      <th>Best Value</th>
+                  </tr>`;
+
+              for (const dataPoint of metric.data) {
+                  metricsContent += `<tr>
+                      <td>${dataPoint.dataset_name}</td>
+                      <td>${dataPoint.final_value?.toFixed(4) || 'N/A'}</td>
+                      <td>${dataPoint.best_value?.toFixed(4) || 'N/A'}</td>
+                  </tr>`;
+              }
+
+              metricsContent += `</table></div>`;
+          }
+      } else if (metrics === null) {
+          metricsContent += `<p>No metrics available</p>`;
+      }
+      metricsElm.innerHTML = metricsContent;
+  }
+
+  // Add plots display
+  const plotsElm = document.getElementById("plots");
+  if (plotsElm) {
+      if (plots && plots.length > 0) {
+          let plotsContent = '';
+          plots.forEach(plotPath => {
+              plotsContent += `
+                  <div class="plot-item">
+                      <img src="${plotPath}" alt="Experiment Plot" onerror="console.error('Failed to load plot:', this.src)"/>
+                  </div>`;
+          });
+          plotsElm.innerHTML = plotsContent;
+      } else {
+          plotsElm.innerHTML = '';
+      }
+  }
+
+  // Add error info display
+  const errorElm = document.getElementById("exc_info");
+  if (errorElm) {
+    if (exc_type) {
+      let errorContent = `<h3 style="color: #ff5555">Exception Information:</h3>
+                          <p><strong>Type:</strong> ${exc_type}</p>`;
+
+      if (exc_info) {
+        errorContent += `<p><strong>Details:</strong> <pre>${JSON.stringify(exc_info, null, 2)}</pre></p>`;
+      }
+
+      if (exc_stack) {
+        errorContent += `<p><strong>Stack Trace:</strong> <pre>${exc_stack.join('\n')}</pre></p>`;
+      }
+
+      errorElm.innerHTML = errorContent;
+    } else {
+      errorElm.innerHTML = "No exception info available";
+    }
+  }
+
+  const exec_timeElm = document.getElementById("exec_time");
+  if (exec_timeElm) {
+    let exec_timeContent = '<div id="exec_time"><h3>Execution Time (in seconds):</h3><p>' + exec_time + '</p></div>';
+    exec_timeElm.innerHTML = exec_timeContent;
+  }
+
+  const exec_time_feedbackElm = document.getElementById("exec_time_feedback");
+  if (exec_time_feedbackElm) {
+    let exec_time_feedbackContent = '<div id="exec_time_feedback_content">'
+    exec_time_feedbackContent += '<h3>Execution Time Feedback:</h3>'
+    exec_time_feedbackContent += '<p>' + exec_time_feedback + '</p>'
+    exec_time_feedbackContent += '</div>';
+    exec_time_feedbackElm.innerHTML = exec_time_feedbackContent;
+  }
+
+  const vlm_feedbackElm = document.getElementById("vlm_feedback");
+  if (vlm_feedbackElm) {
+      let vlm_feedbackContent = '';
+
+      if (plot_analyses && plot_analyses.length > 0) {
+          vlm_feedbackContent += `<h3>Plot Analysis:</h3>`;
+          plot_analyses.forEach(analysis => {
+              if (analysis && analysis.plot_path) {  // Add null check
+                  vlm_feedbackContent += `
+                      <div class="plot-analysis">
+                          <h4>Analysis for ${analysis.plot_path.split('/').pop()}</h4>
+                          <p>${analysis.analysis || 'No analysis available'}</p>
+                          <ul class="key-findings">
+                              ${(analysis.key_findings || []).map(finding => `<li>${finding}</li>`).join('')}
+                          </ul>
+                      </div>`;
+              } else {
+                  console.warn('Received invalid plot analysis:', analysis);
+                  vlm_feedbackContent += `
+                      <div class="plot-analysis">
+                          <p>Invalid plot analysis data received</p>
+                      </div>`;
+              }
+          });
+      }
+
+      // Add actionable insights if available
+      if (vlm_feedback_summary && typeof vlm_feedback_summary === 'string') {
+          vlm_feedbackContent += `
+              <div class="vlm_feedback">
+                  <h3>VLM Feedback Summary:</h3>
+                  <p>${vlm_feedback_summary}</p>
+              </div>`;
+      }
+
+      console.log("Datasets successfully tested:", datasets_successfully_tested);
+      if (datasets_successfully_tested && datasets_successfully_tested.length > 0) {
+          vlm_feedbackContent += `
+              <div id="datasets_successfully_tested">
+                  <h3>Datasets Successfully Tested:</h3>
+                  <p>${datasets_successfully_tested.join(', ')}</p>
+              </div>`;
+      }
+
+      if (!vlm_feedbackContent) {
+          vlm_feedbackContent = '<p>No insights available for this experiment.</p>';
+      }
+
+      vlm_feedbackElm.innerHTML = vlm_feedbackContent;
+  }
+
+  const datasets_successfully_testedElm = document.getElementById("datasets_successfully_tested");
+  if (datasets_successfully_testedElm) {
+      let datasets_successfully_testedContent = '';
+      if (datasets_successfully_tested && datasets_successfully_tested.length > 0) {
+          datasets_successfully_testedContent = `<h3>Datasets Successfully Tested:</h3><ul>`;
+          datasets_successfully_tested.forEach(dataset => {
+              datasets_successfully_testedContent += `<li>${dataset}</li>`;
+          });
+          datasets_successfully_testedContent += `</ul>`;
+      } else {
+          datasets_successfully_testedContent = '<p>No datasets tested yet</p>';
+      }
+      datasets_successfully_testedElm.innerHTML = datasets_successfully_testedContent;
+  }
+};
+
+// Initialize with the provided tree data
+const treeStructData = {"edges": [[1, 5], [1, 6], [1, 4], [1, 3]], "layout": [[0.16666666666666666, 0.0], [0.5, 0.0], [0.8333333333333334, 0.0], [0.0, 1.0], [0.3333333333333333, 1.0], [0.6666666666666666, 1.0], [1.0, 1.0]], "plan": ["We generate a small synthetic sentiment dataset (I love this movie. / I hate\nthis song.) with binary labels and split into train/val. We fine-tune DistilBERT\non this data for a few epochs, tracking train/val loss. To simulate\n\u201csemantically equivalent\u201d prompts, we apply lightweight paraphrasing by randomly\nreplacing key words with synonyms. At each epoch\u2019s end, we compute the model\u2019s\npredicted positive\u2010class probabilities on 3 paraphrases per example in val (and\na small subset of train) and take the standard deviation as our divergence\nscore. We define \u201challucination\u201d as a misclassification on the original input\nand compute ROC\u2010AUC using divergence to predict misclassification. We log\nHallucination Detection AUC\u2010ROC and losses per epoch, print validation loss and\nAUC each epoch, and save all metrics, predictions, and ground\u2010truth into\n./working/experiment_data.npy for later analysis.", "We simulate Perturbation-Induced Uncertainty by sampling synthetic divergence\nscores for \u201ccorrect\u201d and \u201challucinated\u201d examples, then train a simple logistic\nregression in PyTorch to map divergence to hallucination risk. We draw\ndivergence values from different distributions for each class to mimic higher\noutput variability when the model is wrong. We assemble synthetic data into\ntrain and validation splits and wrap them in DataLoaders. Our detector is a one-\ndimensional linear model with sigmoid output, optimized with BCEWithLogitsLoss\non GPU if available. We train for a fixed number of epochs, computing train and\nval losses as well as AUC-ROC for hallucination detection at each epoch. We\nprint the validation loss per epoch and record all metrics, losses, predictions,\nand ground truths in an experiment_data dictionary. Finally, we save the\nexperiment_data as a numpy file in the working directory. This minimal pipeline\nestablishes a solid baseline that can later be extended to real LLM outputs and\nparaphrase-based divergences.", "We propose a simple synthetic experiment to demonstrate Perturbation-Induced\nUncertainty (PIU) on a surrogate MLP \"LLM\" trained on a binary classification\ntask. We generate a synthetic dataset, split it into train and validation sets,\nand train a two-layer neural network over a few epochs, tracking losses. At each\nepoch, we create K Gaussian-perturbed copies of each input to simulate\nsemantically equivalent paraphrases, run them through the model, and define the\nuncertainty score as one minus the fraction of paraphrases that agree on the\nmost frequent predicted class. We label samples where the model\u2019s original\nprediction differs from the ground truth as hallucinations and compute the AUC-\nROC of uncertainty scores for error detection on both splits. We log\ntrain/validation losses and detection AUCs each epoch into an experiment_data\ndictionary, then save it as a numpy file. Finally, we visualize the distribution\nof uncertainty scores for correct versus incorrect predictions as a histogram\nsaved to the working directory. This baseline captures the core idea of PIU in a\ncontrolled, fully reproducible synthetic setup without external LLM APIs.", "Seed node", "Seed node", "Seed node", "Aggregate results from multiple seeds"], "code": ["import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\nimport torch\nimport numpy as np\nimport random\nfrom torch.utils.data import Dataset, DataLoader\nfrom transformers import DistilBertTokenizerFast, DistilBertForSequenceClassification\nimport torch.nn.functional as F\nfrom sklearn.metrics import roc_auc_score\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# simple paraphrase via synonyms\nsynonyms = {\n    \"love\": [\"adore\", \"like\"],\n    \"like\": [\"enjoy\", \"appreciate\"],\n    \"enjoy\": [\"relish\", \"savor\"],\n    \"hate\": [\"detest\", \"dislike\"],\n    \"dislike\": [\"loathe\", \"disfavor\"],\n    \"detest\": [\"abhor\", \"loathe\"],\n    \"movie\": [\"film\", \"motion picture\"],\n    \"film\": [\"movie\", \"cinema\"],\n    \"song\": [\"track\", \"tune\"],\n}\n\n\ndef paraphrase(sentence):\n    words = sentence.split()\n    new = []\n    for w in words:\n        key = w.lower().strip(\".,!?\")\n        if key in synonyms and random.random() < 0.5:\n            choice = random.choice(synonyms[key])\n            if w[0].isupper():\n                choice = choice.capitalize()\n            if w.endswith(\".\"):\n                choice += \".\"\n            new.append(choice)\n        else:\n            new.append(w)\n    return \" \".join(new)\n\n\n# synthetic sentiment data\nverbs_pos = [\"love\", \"like\", \"enjoy\"]\nverbs_neg = [\"hate\", \"dislike\", \"detest\"]\nnouns = [\"movie\", \"film\", \"song\"]\nnum_samples = 1000\nsents, labs = [], []\nfor _ in range(num_samples // 2):\n    sents.append(f\"I {random.choice(verbs_pos)} this {random.choice(nouns)}.\")\n    labs.append(1)\nfor _ in range(num_samples // 2):\n    sents.append(f\"I {random.choice(verbs_neg)} this {random.choice(nouns)}.\")\n    labs.append(0)\ndata = list(zip(sents, labs))\nrandom.shuffle(data)\nsents, labs = zip(*data)\nsplit = int(0.8 * len(sents))\ntrain_s, train_l = sents[:split], labs[:split]\nval_s, val_l = sents[split:], labs[split:]\n\n# model and tokenizer\ntokenizer = DistilBertTokenizerFast.from_pretrained(\"distilbert-base-uncased\")\nmodel = DistilBertForSequenceClassification.from_pretrained(\n    \"distilbert-base-uncased\", num_labels=2\n).to(device)\n\n\nclass SentimentDataset(Dataset):\n    def __init__(self, sents, labs):\n        self.sents, self.labs = list(sents), list(labs)\n\n    def __len__(self):\n        return len(self.sents)\n\n    def __getitem__(self, i):\n        enc = tokenizer(\n            self.sents[i],\n            padding=\"max_length\",\n            truncation=True,\n            max_length=32,\n            return_tensors=\"pt\",\n        )\n        item = {k: v.squeeze(0) for k, v in enc.items()}\n        item[\"labels\"] = torch.tensor(self.labs[i], dtype=torch.long)\n        return item\n\n\ntrain_ds = SentimentDataset(train_s, train_l)\nval_ds = SentimentDataset(val_s, val_l)\ntrain_loader = DataLoader(train_ds, batch_size=16, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=16)\n\noptimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)\nexperiment_data = {\n    \"synthetic_sentiment\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n# training loop\nepochs = 3\nfor epoch in range(epochs):\n    model.train()\n    train_loss = 0\n    for batch in train_loader:\n        batch = {\n            k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)\n        }\n        out = model(**batch)\n        loss = out.loss\n        loss.backward()\n        optimizer.step()\n        optimizer.zero_grad()\n        train_loss += loss.item()\n    avg_train_loss = train_loss / len(train_loader)\n    experiment_data[\"synthetic_sentiment\"][\"losses\"][\"train\"].append(avg_train_loss)\n\n    model.eval()\n    val_loss = 0\n    with torch.no_grad():\n        for batch in val_loader:\n            batch = {\n                k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)\n            }\n            val_loss += model(**batch).loss.item()\n    avg_val_loss = val_loss / len(val_loader)\n    experiment_data[\"synthetic_sentiment\"][\"losses\"][\"val\"].append(avg_val_loss)\n    print(f\"Epoch {epoch}: validation_loss = {avg_val_loss:.4f}\")\n\n    # compute hallucination-detection AUC on val\n    divergences, mislabels = [], []\n    for sent, lab in zip(val_s, val_l):\n        probs = []\n        for _ in range(3):\n            enc = tokenizer(\n                paraphrase(sent),\n                padding=\"max_length\",\n                truncation=True,\n                max_length=32,\n                return_tensors=\"pt\",\n            )\n            enc = {k: v.to(device) for k, v in enc.items()}\n            logits = model(**enc).logits\n            probs.append(F.softmax(logits, dim=-1)[0, 1].item())\n        divergences.append(np.std(probs))\n        enc0 = tokenizer(\n            sent,\n            padding=\"max_length\",\n            truncation=True,\n            max_length=32,\n            return_tensors=\"pt\",\n        )\n        enc0 = {k: v.to(device) for k, v in enc0.items()}\n        pred0 = torch.argmax(model(**enc0).logits, dim=-1).item()\n        mislabels.append(1 if pred0 != lab else 0)\n    try:\n        val_auc = roc_auc_score(mislabels, divergences)\n    except:\n        val_auc = float(\"nan\")\n    experiment_data[\"synthetic_sentiment\"][\"metrics\"][\"val\"].append(val_auc)\n    print(f\"Epoch {epoch}: Hallucination Detection AUC-ROC val = {val_auc:.4f}\")\n\n# final predictions & save\nfinal_preds = []\nfor sent in val_s:\n    enc = tokenizer(\n        sent, padding=\"max_length\", truncation=True, max_length=32, return_tensors=\"pt\"\n    )\n    enc = {k: v.to(device) for k, v in enc.items()}\n    final_preds.append(torch.argmax(model(**enc).logits, dim=-1).item())\nexperiment_data[\"synthetic_sentiment\"][\"predictions\"] = final_preds\nexperiment_data[\"synthetic_sentiment\"][\"ground_truth\"] = list(val_l)\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport torch\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\nimport numpy as np\nfrom torch import nn\nfrom torch.utils.data import DataLoader, TensorDataset\nfrom sklearn.metrics import roc_auc_score\n\n\n# Synthetic data generation\ndef sample_data(N):\n    N0 = N // 2\n    N1 = N - N0\n    d0 = np.clip(np.random.normal(0, 0.5, size=N0), 0, None)\n    d1 = np.clip(np.random.normal(2, 1.0, size=N1), 0, None)\n    xs = np.concatenate([d0, d1]).astype(np.float32).reshape(-1, 1)\n    ys = np.concatenate([np.zeros(N0), np.ones(N1)]).astype(np.float32)\n    idx = np.random.permutation(N)\n    return xs[idx], ys[idx]\n\n\n# Prepare datasets\nx_train, y_train = sample_data(1000)\nx_val, y_val = sample_data(200)\ntrain_ds = TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train))\nval_ds = TensorDataset(torch.from_numpy(x_val), torch.from_numpy(y_val))\ntrain_loader = DataLoader(train_ds, batch_size=32, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=32)\n\n# Model and optimizer\nmodel = nn.Linear(1, 1).to(device)\noptimizer = torch.optim.Adam(model.parameters(), lr=0.01)\nloss_fn = nn.BCEWithLogitsLoss()\n\n# Experiment tracking\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n# Training loop\nepochs = 20\nfor epoch in range(1, epochs + 1):\n    # Train\n    model.train()\n    train_losses, all_preds, all_labels = [], [], []\n    for xb, yb in train_loader:\n        xb, yb = xb.to(device), yb.to(device)\n        logits = model(xb).squeeze(1)\n        loss = loss_fn(logits, yb)\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n        train_losses.append(loss.item())\n        all_preds.append(torch.sigmoid(logits).detach().cpu().numpy())\n        all_labels.append(yb.cpu().numpy())\n    train_loss = np.mean(train_losses)\n    train_preds = np.concatenate(all_preds)\n    train_labels = np.concatenate(all_labels)\n    train_auc = roc_auc_score(train_labels, train_preds)\n\n    # Validate\n    model.eval()\n    val_losses, v_preds, v_labels = [], [], []\n    with torch.no_grad():\n        for xb, yb in val_loader:\n            xb, yb = xb.to(device), yb.to(device)\n            logits = model(xb).squeeze(1)\n            loss = loss_fn(logits, yb)\n            val_losses.append(loss.item())\n            v_preds.append(torch.sigmoid(logits).cpu().numpy())\n            v_labels.append(yb.cpu().numpy())\n    val_loss = np.mean(val_losses)\n    val_preds = np.concatenate(v_preds)\n    val_labels = np.concatenate(v_labels)\n    val_auc = roc_auc_score(val_labels, val_preds)\n\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n\n    # Record metrics\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(train_loss)\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(val_loss)\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_auc)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_auc)\n    experiment_data[\"synthetic\"][\"predictions\"].append(val_preds)\n    experiment_data[\"synthetic\"][\"ground_truth\"].append(val_labels)\n\n# Save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "import os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.optim as optim\nfrom torch.utils.data import TensorDataset, DataLoader\nfrom sklearn.datasets import make_classification\nfrom sklearn.metrics import roc_auc_score\nimport matplotlib.pyplot as plt\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\n# Generate synthetic classification data\nX, y = make_classification(\n    n_samples=2000, n_features=20, n_informative=15, n_redundant=5, random_state=42\n)\nsplit = int(0.8 * X.shape[0])\nX_train_np, X_val_np = X[:split], X[split:]\ny_train_np, y_val_np = y[:split], y[split:]\nX_train = torch.tensor(X_train_np, dtype=torch.float32)\ny_train = torch.tensor(y_train_np, dtype=torch.long)\nX_val = torch.tensor(X_val_np, dtype=torch.float32)\ny_val = torch.tensor(y_val_np, dtype=torch.long)\n\ntrain_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=64, shuffle=True)\nval_loader = DataLoader(TensorDataset(X_val, y_val), batch_size=64, shuffle=False)\n\n\n# Define a simple MLP\nclass MLP(nn.Module):\n    def __init__(self, input_dim, hidden=64, num_classes=2):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(input_dim, hidden), nn.ReLU(), nn.Linear(hidden, num_classes)\n        )\n\n    def forward(self, x):\n        return self.net(x)\n\n\nmodel = MLP(input_dim=20).to(device)\noptimizer = optim.Adam(model.parameters(), lr=1e-3)\ncriterion = nn.CrossEntropyLoss()\n\n# Prepare experiment data storage\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\nnum_epochs = 10\nK = 5  # number of perturbations\n\n\ndef compute_auc(X_all, y_all):\n    X_all = X_all.to(device)\n    with torch.no_grad():\n        orig_logits = model(X_all)\n        orig_preds = torch.argmax(orig_logits, dim=1).cpu().numpy()\n    # generate perturbations\n    X_rep = X_all.unsqueeze(1).repeat(1, K, 1)\n    noise = torch.randn_like(X_rep) * 0.1\n    X_pert = (X_rep + noise).view(-1, X_all.size(1))\n    with torch.no_grad():\n        logits_k = model(X_pert)\n        preds_k = torch.argmax(logits_k, dim=1).view(-1, K).cpu().numpy()\n    errors = (orig_preds != y_all.numpy()).astype(int)\n    divergence = []\n    for pk in preds_k:\n        _, counts = np.unique(pk, return_counts=True)\n        f_max = counts.max()\n        divergence.append(1 - f_max / K)\n    auc = roc_auc_score(errors, divergence)\n    return auc, errors, divergence\n\n\n# Training loop\nfor epoch in range(1, num_epochs + 1):\n    # Train\n    model.train()\n    train_loss = 0.0\n    for Xb, yb in train_loader:\n        Xb, yb = Xb.to(device), yb.to(device)\n        optimizer.zero_grad()\n        loss = criterion(model(Xb), yb)\n        loss.backward()\n        optimizer.step()\n        train_loss += loss.item() * Xb.size(0)\n    train_loss /= len(train_loader.dataset)\n    # Validate\n    model.eval()\n    val_loss = 0.0\n    with torch.no_grad():\n        for Xb, yb in val_loader:\n            Xb, yb = Xb.to(device), yb.to(device)\n            loss = criterion(model(Xb), yb)\n            val_loss += loss.item() * Xb.size(0)\n    val_loss /= len(val_loader.dataset)\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n    # Compute detection AUCs\n    train_auc, _, _ = compute_auc(X_train, y_train)\n    val_auc, val_errors, val_div = compute_auc(X_val, y_val)\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(train_loss)\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(val_loss)\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_auc)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_auc)\n\n# Record final predictions and ground truth\nexperiment_data[\"synthetic\"][\"predictions\"] = val_div\nexperiment_data[\"synthetic\"][\"ground_truth\"] = val_errors\n\n# Save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n\n# Visualization: histogram of divergence scores\nplt.figure()\nval_div = np.array(val_div)\nval_errors = np.array(val_errors)\nplt.hist(val_div[val_errors == 0], bins=20, alpha=0.5, label=\"Correct\")\nplt.hist(val_div[val_errors == 1], bins=20, alpha=0.5, label=\"Incorrect\")\nplt.legend()\nplt.title(\"Divergence Distribution on Val Set\")\nplt.xlabel(\"Uncertainty Score (Divergence)\")\nplt.ylabel(\"Count\")\nplt.savefig(os.path.join(working_dir, \"divergence_histogram.png\"))\n\nprint(f\"Final validation Hallucination Detection AUC-ROC: {val_auc:.4f}\")\n", "# Set random seed\nimport random\nimport numpy as np\nimport torch\n\nseed = 0\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport torch\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\nimport numpy as np\nfrom torch import nn\nfrom torch.utils.data import DataLoader, TensorDataset\nfrom sklearn.metrics import roc_auc_score\n\n\n# Synthetic data generation\ndef sample_data(N):\n    N0 = N // 2\n    N1 = N - N0\n    d0 = np.clip(np.random.normal(0, 0.5, size=N0), 0, None)\n    d1 = np.clip(np.random.normal(2, 1.0, size=N1), 0, None)\n    xs = np.concatenate([d0, d1]).astype(np.float32).reshape(-1, 1)\n    ys = np.concatenate([np.zeros(N0), np.ones(N1)]).astype(np.float32)\n    idx = np.random.permutation(N)\n    return xs[idx], ys[idx]\n\n\n# Prepare datasets\nx_train, y_train = sample_data(1000)\nx_val, y_val = sample_data(200)\ntrain_ds = TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train))\nval_ds = TensorDataset(torch.from_numpy(x_val), torch.from_numpy(y_val))\ntrain_loader = DataLoader(train_ds, batch_size=32, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=32)\n\n# Model and optimizer\nmodel = nn.Linear(1, 1).to(device)\noptimizer = torch.optim.Adam(model.parameters(), lr=0.01)\nloss_fn = nn.BCEWithLogitsLoss()\n\n# Experiment tracking\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n# Training loop\nepochs = 20\nfor epoch in range(1, epochs + 1):\n    # Train\n    model.train()\n    train_losses, all_preds, all_labels = [], [], []\n    for xb, yb in train_loader:\n        xb, yb = xb.to(device), yb.to(device)\n        logits = model(xb).squeeze(1)\n        loss = loss_fn(logits, yb)\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n        train_losses.append(loss.item())\n        all_preds.append(torch.sigmoid(logits).detach().cpu().numpy())\n        all_labels.append(yb.cpu().numpy())\n    train_loss = np.mean(train_losses)\n    train_preds = np.concatenate(all_preds)\n    train_labels = np.concatenate(all_labels)\n    train_auc = roc_auc_score(train_labels, train_preds)\n\n    # Validate\n    model.eval()\n    val_losses, v_preds, v_labels = [], [], []\n    with torch.no_grad():\n        for xb, yb in val_loader:\n            xb, yb = xb.to(device), yb.to(device)\n            logits = model(xb).squeeze(1)\n            loss = loss_fn(logits, yb)\n            val_losses.append(loss.item())\n            v_preds.append(torch.sigmoid(logits).cpu().numpy())\n            v_labels.append(yb.cpu().numpy())\n    val_loss = np.mean(val_losses)\n    val_preds = np.concatenate(v_preds)\n    val_labels = np.concatenate(v_labels)\n    val_auc = roc_auc_score(val_labels, val_preds)\n\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n\n    # Record metrics\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(train_loss)\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(val_loss)\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_auc)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_auc)\n    experiment_data[\"synthetic\"][\"predictions\"].append(val_preds)\n    experiment_data[\"synthetic\"][\"ground_truth\"].append(val_labels)\n\n# Save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "# Set random seed\nimport random\nimport numpy as np\nimport torch\n\nseed = 1\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport torch\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\nimport numpy as np\nfrom torch import nn\nfrom torch.utils.data import DataLoader, TensorDataset\nfrom sklearn.metrics import roc_auc_score\n\n\n# Synthetic data generation\ndef sample_data(N):\n    N0 = N // 2\n    N1 = N - N0\n    d0 = np.clip(np.random.normal(0, 0.5, size=N0), 0, None)\n    d1 = np.clip(np.random.normal(2, 1.0, size=N1), 0, None)\n    xs = np.concatenate([d0, d1]).astype(np.float32).reshape(-1, 1)\n    ys = np.concatenate([np.zeros(N0), np.ones(N1)]).astype(np.float32)\n    idx = np.random.permutation(N)\n    return xs[idx], ys[idx]\n\n\n# Prepare datasets\nx_train, y_train = sample_data(1000)\nx_val, y_val = sample_data(200)\ntrain_ds = TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train))\nval_ds = TensorDataset(torch.from_numpy(x_val), torch.from_numpy(y_val))\ntrain_loader = DataLoader(train_ds, batch_size=32, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=32)\n\n# Model and optimizer\nmodel = nn.Linear(1, 1).to(device)\noptimizer = torch.optim.Adam(model.parameters(), lr=0.01)\nloss_fn = nn.BCEWithLogitsLoss()\n\n# Experiment tracking\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n# Training loop\nepochs = 20\nfor epoch in range(1, epochs + 1):\n    # Train\n    model.train()\n    train_losses, all_preds, all_labels = [], [], []\n    for xb, yb in train_loader:\n        xb, yb = xb.to(device), yb.to(device)\n        logits = model(xb).squeeze(1)\n        loss = loss_fn(logits, yb)\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n        train_losses.append(loss.item())\n        all_preds.append(torch.sigmoid(logits).detach().cpu().numpy())\n        all_labels.append(yb.cpu().numpy())\n    train_loss = np.mean(train_losses)\n    train_preds = np.concatenate(all_preds)\n    train_labels = np.concatenate(all_labels)\n    train_auc = roc_auc_score(train_labels, train_preds)\n\n    # Validate\n    model.eval()\n    val_losses, v_preds, v_labels = [], [], []\n    with torch.no_grad():\n        for xb, yb in val_loader:\n            xb, yb = xb.to(device), yb.to(device)\n            logits = model(xb).squeeze(1)\n            loss = loss_fn(logits, yb)\n            val_losses.append(loss.item())\n            v_preds.append(torch.sigmoid(logits).cpu().numpy())\n            v_labels.append(yb.cpu().numpy())\n    val_loss = np.mean(val_losses)\n    val_preds = np.concatenate(v_preds)\n    val_labels = np.concatenate(v_labels)\n    val_auc = roc_auc_score(val_labels, val_preds)\n\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n\n    # Record metrics\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(train_loss)\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(val_loss)\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_auc)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_auc)\n    experiment_data[\"synthetic\"][\"predictions\"].append(val_preds)\n    experiment_data[\"synthetic\"][\"ground_truth\"].append(val_labels)\n\n# Save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "# Set random seed\nimport random\nimport numpy as np\nimport torch\n\nseed = 2\nrandom.seed(seed)\nnp.random.seed(seed)\ntorch.manual_seed(seed)\nif torch.cuda.is_available():\n    torch.cuda.manual_seed(seed)\n\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\nimport torch\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\nimport numpy as np\nfrom torch import nn\nfrom torch.utils.data import DataLoader, TensorDataset\nfrom sklearn.metrics import roc_auc_score\n\n\n# Synthetic data generation\ndef sample_data(N):\n    N0 = N // 2\n    N1 = N - N0\n    d0 = np.clip(np.random.normal(0, 0.5, size=N0), 0, None)\n    d1 = np.clip(np.random.normal(2, 1.0, size=N1), 0, None)\n    xs = np.concatenate([d0, d1]).astype(np.float32).reshape(-1, 1)\n    ys = np.concatenate([np.zeros(N0), np.ones(N1)]).astype(np.float32)\n    idx = np.random.permutation(N)\n    return xs[idx], ys[idx]\n\n\n# Prepare datasets\nx_train, y_train = sample_data(1000)\nx_val, y_val = sample_data(200)\ntrain_ds = TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train))\nval_ds = TensorDataset(torch.from_numpy(x_val), torch.from_numpy(y_val))\ntrain_loader = DataLoader(train_ds, batch_size=32, shuffle=True)\nval_loader = DataLoader(val_ds, batch_size=32)\n\n# Model and optimizer\nmodel = nn.Linear(1, 1).to(device)\noptimizer = torch.optim.Adam(model.parameters(), lr=0.01)\nloss_fn = nn.BCEWithLogitsLoss()\n\n# Experiment tracking\nexperiment_data = {\n    \"synthetic\": {\n        \"metrics\": {\"train\": [], \"val\": []},\n        \"losses\": {\"train\": [], \"val\": []},\n        \"predictions\": [],\n        \"ground_truth\": [],\n    }\n}\n\n# Training loop\nepochs = 20\nfor epoch in range(1, epochs + 1):\n    # Train\n    model.train()\n    train_losses, all_preds, all_labels = [], [], []\n    for xb, yb in train_loader:\n        xb, yb = xb.to(device), yb.to(device)\n        logits = model(xb).squeeze(1)\n        loss = loss_fn(logits, yb)\n        optimizer.zero_grad()\n        loss.backward()\n        optimizer.step()\n        train_losses.append(loss.item())\n        all_preds.append(torch.sigmoid(logits).detach().cpu().numpy())\n        all_labels.append(yb.cpu().numpy())\n    train_loss = np.mean(train_losses)\n    train_preds = np.concatenate(all_preds)\n    train_labels = np.concatenate(all_labels)\n    train_auc = roc_auc_score(train_labels, train_preds)\n\n    # Validate\n    model.eval()\n    val_losses, v_preds, v_labels = [], [], []\n    with torch.no_grad():\n        for xb, yb in val_loader:\n            xb, yb = xb.to(device), yb.to(device)\n            logits = model(xb).squeeze(1)\n            loss = loss_fn(logits, yb)\n            val_losses.append(loss.item())\n            v_preds.append(torch.sigmoid(logits).cpu().numpy())\n            v_labels.append(yb.cpu().numpy())\n    val_loss = np.mean(val_losses)\n    val_preds = np.concatenate(v_preds)\n    val_labels = np.concatenate(v_labels)\n    val_auc = roc_auc_score(val_labels, val_preds)\n\n    print(f\"Epoch {epoch}: validation_loss = {val_loss:.4f}\")\n\n    # Record metrics\n    experiment_data[\"synthetic\"][\"losses\"][\"train\"].append(train_loss)\n    experiment_data[\"synthetic\"][\"losses\"][\"val\"].append(val_loss)\n    experiment_data[\"synthetic\"][\"metrics\"][\"train\"].append(train_auc)\n    experiment_data[\"synthetic\"][\"metrics\"][\"val\"].append(val_auc)\n    experiment_data[\"synthetic\"][\"predictions\"].append(val_preds)\n    experiment_data[\"synthetic\"][\"ground_truth\"].append(val_labels)\n\n# Save experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n", "# plotting aggregation code"], "term_out": ["['Using device: cuda', '\\n', \"Some weights of\nDistilBertForSequenceClassification were not initialized from the model\ncheckpoint at distilbert-base-uncased and are newly initialized:\n['classifier.bias', 'classifier.weight', 'pre_classifier.bias',\n'pre_classifier.weight']\\nYou should probably TRAIN this model on a down-stream\ntask to be able to use it for predictions and inference.\\n\", 'Epoch 0:\nvalidation_loss = 0.0016', '\\n', 'Epoch 0: Hallucination Detection AUC-ROC val =\nnan', '\\n', 'Epoch 1: validation_loss = 0.0006', '\\n', 'Epoch 1: Hallucination\nDetection AUC-ROC val = nan', '\\n', 'Epoch 2: validation_loss = 0.0003', '\\n',\n'Epoch 2: Hallucination Detection AUC-ROC val = nan', '\\n', 'Execution time: 19\nseconds seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Epoch 1: validation_loss = 0.6511', '\\n', 'Epoch\n2: validation_loss = 0.5682', '\\n', 'Epoch 3: validation_loss = 0.5067', '\\n',\n'Epoch 4: validation_loss = 0.4590', '\\n', 'Epoch 5: validation_loss = 0.4226',\n'\\n', 'Epoch 6: validation_loss = 0.3953', '\\n', 'Epoch 7: validation_loss =\n0.3739', '\\n', 'Epoch 8: validation_loss = 0.3571', '\\n', 'Epoch 9:\nvalidation_loss = 0.3436', '\\n', 'Epoch 10: validation_loss = 0.3326', '\\n',\n'Epoch 11: validation_loss = 0.3239', '\\n', 'Epoch 12: validation_loss =\n0.3166', '\\n', 'Epoch 13: validation_loss = 0.3109', '\\n', 'Epoch 14:\nvalidation_loss = 0.3053', '\\n', 'Epoch 15: validation_loss = 0.3009', '\\n',\n'Epoch 16: validation_loss = 0.2971', '\\n', 'Epoch 17: validation_loss =\n0.2943', '\\n', 'Epoch 18: validation_loss = 0.2915', '\\n', 'Epoch 19:\nvalidation_loss = 0.2886', '\\n', 'Epoch 20: validation_loss = 0.2861', '\\n',\n'Execution time: 2 seconds seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Epoch 1: validation_loss = 0.5983', '\\n', 'Epoch\n2: validation_loss = 0.4685', '\\n', 'Epoch 3: validation_loss = 0.4098', '\\n',\n'Epoch 4: validation_loss = 0.3687', '\\n', 'Epoch 5: validation_loss = 0.3345',\n'\\n', 'Epoch 6: validation_loss = 0.3096', '\\n', 'Epoch 7: validation_loss =\n0.2810', '\\n', 'Epoch 8: validation_loss = 0.2627', '\\n', 'Epoch 9:\nvalidation_loss = 0.2445', '\\n', 'Epoch 10: validation_loss = 0.2318', '\\n',\n'Final validation Hallucination Detection AUC-ROC: 0.5083', '\\n', 'Execution\ntime: 2 seconds seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Epoch 1: validation_loss = 0.6042', '\\n', 'Epoch\n2: validation_loss = 0.5185', '\\n', 'Epoch 3: validation_loss = 0.4537', '\\n',\n'Epoch 4: validation_loss = 0.4061', '\\n', 'Epoch 5: validation_loss = 0.3697',\n'\\n', 'Epoch 6: validation_loss = 0.3420', '\\n', 'Epoch 7: validation_loss =\n0.3201', '\\n', 'Epoch 8: validation_loss = 0.3038', '\\n', 'Epoch 9:\nvalidation_loss = 0.2900', '\\n', 'Epoch 10: validation_loss = 0.2787', '\\n',\n'Epoch 11: validation_loss = 0.2695', '\\n', 'Epoch 12: validation_loss =\n0.2615', '\\n', 'Epoch 13: validation_loss = 0.2552', '\\n', 'Epoch 14:\nvalidation_loss = 0.2497', '\\n', 'Epoch 15: validation_loss = 0.2451', '\\n',\n'Epoch 16: validation_loss = 0.2412', '\\n', 'Epoch 17: validation_loss =\n0.2378', '\\n', 'Epoch 18: validation_loss = 0.2349', '\\n', 'Epoch 19:\nvalidation_loss = 0.2323', '\\n', 'Epoch 20: validation_loss = 0.2303', '\\n',\n'Execution time: 2 seconds seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Epoch 1: validation_loss = 0.4473', '\\n', 'Epoch\n2: validation_loss = 0.4016', '\\n', 'Epoch 3: validation_loss = 0.3683', '\\n',\n'Epoch 4: validation_loss = 0.3433', '\\n', 'Epoch 5: validation_loss = 0.3243',\n'\\n', 'Epoch 6: validation_loss = 0.3089', '\\n', 'Epoch 7: validation_loss =\n0.2967', '\\n', 'Epoch 8: validation_loss = 0.2876', '\\n', 'Epoch 9:\nvalidation_loss = 0.2798', '\\n', 'Epoch 10: validation_loss = 0.2735', '\\n',\n'Epoch 11: validation_loss = 0.2678', '\\n', 'Epoch 12: validation_loss =\n0.2631', '\\n', 'Epoch 13: validation_loss = 0.2593', '\\n', 'Epoch 14:\nvalidation_loss = 0.2561', '\\n', 'Epoch 15: validation_loss = 0.2531', '\\n',\n'Epoch 16: validation_loss = 0.2507', '\\n', 'Epoch 17: validation_loss =\n0.2490', '\\n', 'Epoch 18: validation_loss = 0.2473', '\\n', 'Epoch 19:\nvalidation_loss = 0.2452', '\\n', 'Epoch 20: validation_loss = 0.2439', '\\n',\n'Execution time: 2 seconds seconds (time limit is an hour).']", "['Using device: cuda', '\\n', 'Epoch 1: validation_loss = 0.4963', '\\n', 'Epoch\n2: validation_loss = 0.4317', '\\n', 'Epoch 3: validation_loss = 0.3842', '\\n',\n'Epoch 4: validation_loss = 0.3471', '\\n', 'Epoch 5: validation_loss = 0.3191',\n'\\n', 'Epoch 6: validation_loss = 0.2973', '\\n', 'Epoch 7: validation_loss =\n0.2797', '\\n', 'Epoch 8: validation_loss = 0.2653', '\\n', 'Epoch 9:\nvalidation_loss = 0.2534', '\\n', 'Epoch 10: validation_loss = 0.2434', '\\n',\n'Epoch 11: validation_loss = 0.2349', '\\n', 'Epoch 12: validation_loss =\n0.2281', '\\n', 'Epoch 13: validation_loss = 0.2221', '\\n', 'Epoch 14:\nvalidation_loss = 0.2168', '\\n', 'Epoch 15: validation_loss = 0.2121', '\\n',\n'Epoch 16: validation_loss = 0.2082', '\\n', 'Epoch 17: validation_loss =\n0.2049', '\\n', 'Epoch 18: validation_loss = 0.2020', '\\n', 'Epoch 19:\nvalidation_loss = 0.1992', '\\n', 'Epoch 20: validation_loss = 0.1967', '\\n',\n'Execution time: 2 seconds seconds (time limit is an hour).']", ""], "analysis": ["The training and inference code ran without runtime errors, but the\nhallucination-detection AUC-ROC metric is NaN for all epochs. This happens\nbecause roc_auc_score is being called on a boolean mislabels vector that\ncontains only one class (all 0s or all 1s) when the model makes no mistakes (or\nuniform mistakes) on the trivial synthetic dataset. As a result, roc_auc_score\nthrows an exception which is caught and masked, producing NaNs. To fix this, use\na dataset or model/hyperparameter setting that yields both correct and incorrect\npredictions (so that y_true has at least two classes) before computing AUC, or\nadd a guard that checks for at least two unique classes in the mislabels array\nand skips or assigns a default AUC when this condition is not met.", "", "", "", "", "", ""], "exc_type": [null, null, null, null, null, null, null], "exc_info": [null, null, null, null, null, null, null], "exc_stack": [null, null, null, null, null, null, null], "exp_name": "0-run", "metrics": [{"metric_names": [{"metric_name": "training loss", "lower_is_better": true, "description": "Training loss", "data": [{"dataset_name": "synthetic_sentiment", "final_value": 0.0006, "best_value": 0.0006}]}, {"metric_name": "validation loss", "lower_is_better": true, "description": "Validation loss", "data": [{"dataset_name": "synthetic_sentiment", "final_value": 0.0003, "best_value": 0.0003}]}, {"metric_name": "validation hallucination detection AUC-ROC", "lower_is_better": false, "description": "AUC-ROC for hallucination detection on the validation set", "data": [{"dataset_name": "synthetic_sentiment", "final_value": null, "best_value": null}]}]}, {"metric_names": [{"metric_name": "Training AUC", "lower_is_better": false, "description": "Area Under the ROC Curve on training data", "data": [{"dataset_name": "synthetic", "final_value": 0.9505, "best_value": 0.9505}]}, {"metric_name": "Validation AUC", "lower_is_better": false, "description": "Area Under the ROC Curve on validation data", "data": [{"dataset_name": "synthetic", "final_value": 0.9572, "best_value": 0.9572}]}, {"metric_name": "Training Loss", "lower_is_better": true, "description": "Binary cross-entropy loss on training data", "data": [{"dataset_name": "synthetic", "final_value": 0.2669, "best_value": 0.2669}]}, {"metric_name": "Validation Loss", "lower_is_better": true, "description": "Binary cross-entropy loss on validation data", "data": [{"dataset_name": "synthetic", "final_value": 0.2861, "best_value": 0.2861}]}]}, {"metric_names": [{"metric_name": "training loss", "lower_is_better": true, "description": "Loss on the synthetic dataset during training", "data": [{"dataset_name": "synthetic dataset", "final_value": 0.2013, "best_value": 0.2013}]}, {"metric_name": "validation loss", "lower_is_better": true, "description": "Loss on the synthetic dataset during validation", "data": [{"dataset_name": "synthetic dataset", "final_value": 0.2318, "best_value": 0.2318}]}, {"metric_name": "training detection AUC-ROC", "lower_is_better": false, "description": "Detection AUC-ROC on the synthetic dataset during training", "data": [{"dataset_name": "synthetic dataset", "final_value": 0.5744, "best_value": 0.5744}]}, {"metric_name": "validation detection AUC-ROC", "lower_is_better": false, "description": "Detection AUC-ROC on the synthetic dataset during validation", "data": [{"dataset_name": "synthetic dataset", "final_value": 0.5083, "best_value": 0.5083}]}]}, {"metric_names": [{"metric_name": "training AUC", "lower_is_better": false, "description": "Area under the ROC curve on the training data", "data": [{"dataset_name": "synthetic", "final_value": 0.9639, "best_value": 0.9639}]}, {"metric_name": "validation AUC", "lower_is_better": false, "description": "Area under the ROC curve on the validation data", "data": [{"dataset_name": "synthetic", "final_value": 0.9718, "best_value": 0.9718}]}, {"metric_name": "training loss", "lower_is_better": true, "description": "Loss on the training data", "data": [{"dataset_name": "synthetic", "final_value": 0.2418, "best_value": 0.2418}]}, {"metric_name": "validation loss", "lower_is_better": true, "description": "Loss on the validation data", "data": [{"dataset_name": "synthetic", "final_value": 0.2303, "best_value": 0.2303}]}]}, {"metric_names": [{"metric_name": "training AUC", "lower_is_better": false, "description": "Area under the ROC curve for the training set", "data": [{"dataset_name": "synthetic", "final_value": 0.9637, "best_value": 0.9637}]}, {"metric_name": "validation AUC", "lower_is_better": false, "description": "Area under the ROC curve for the validation set", "data": [{"dataset_name": "synthetic", "final_value": 0.9624, "best_value": 0.9624}]}, {"metric_name": "training loss", "lower_is_better": true, "description": "Loss on the training set", "data": [{"dataset_name": "synthetic", "final_value": 0.2328, "best_value": 0.2328}]}, {"metric_name": "validation loss", "lower_is_better": true, "description": "Loss on the validation set", "data": [{"dataset_name": "synthetic", "final_value": 0.2439, "best_value": 0.2439}]}]}, {"metric_names": [{"metric_name": "training AUC", "lower_is_better": false, "description": "Area Under the ROC Curve on the training dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.9545, "best_value": 0.9545}]}, {"metric_name": "validation AUC", "lower_is_better": false, "description": "Area Under the ROC Curve on the validation dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.9717, "best_value": 0.9717}]}, {"metric_name": "training loss", "lower_is_better": true, "description": "Loss on the training dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.2462, "best_value": 0.2462}]}, {"metric_name": "validation loss", "lower_is_better": true, "description": "Loss on the validation dataset", "data": [{"dataset_name": "synthetic", "final_value": 0.1967, "best_value": 0.1967}]}]}, {"metric_names": [{"metric_name": "value", "lower_is_better": true, "description": "", "data": [{"dataset_name": "default", "final_value": null, "best_value": null}]}]}], "is_best_node": [false, true, false, false, false, false, false], "plots": [[], ["../../logs/0-run/experiment_results/experiment_56e15adc42294ddab0e8a5292281f6d3_proc_141122/synthetic_auc_curve.png", "../../logs/0-run/experiment_results/experiment_56e15adc42294ddab0e8a5292281f6d3_proc_141122/synthetic_loss_curve.png"], ["../../logs/0-run/experiment_results/experiment_fbb9e2bbad4e4649897bd7c1231d63a8_proc_141123/synthetic_auc_curve.png", "../../logs/0-run/experiment_results/experiment_fbb9e2bbad4e4649897bd7c1231d63a8_proc_141123/divergence_histogram.png", "../../logs/0-run/experiment_results/experiment_fbb9e2bbad4e4649897bd7c1231d63a8_proc_141123/synthetic_divergence_histogram.png", "../../logs/0-run/experiment_results/experiment_fbb9e2bbad4e4649897bd7c1231d63a8_proc_141123/synthetic_loss_curve.png"], ["../../logs/0-run/experiment_results/experiment_7bc52d2190e34fa391c047ab21707aaa_proc_141122/synthetic_auc_curve.png", "../../logs/0-run/experiment_results/experiment_7bc52d2190e34fa391c047ab21707aaa_proc_141122/synthetic_loss_curve.png"], ["../../logs/0-run/experiment_results/experiment_18b75d33e2ce4c69883e353cb19086ef_proc_141123/synthetic_auc_curve.png", "../../logs/0-run/experiment_results/experiment_18b75d33e2ce4c69883e353cb19086ef_proc_141123/synthetic_loss_curve.png"], ["../../logs/0-run/experiment_results/experiment_14b0e680daca45ff9f46f66729ada947_proc_141120/synthetic_auc_curve.png", "../../logs/0-run/experiment_results/experiment_14b0e680daca45ff9f46f66729ada947_proc_141120/synthetic_loss_curve.png"], ["../../logs/0-run/experiment_results/seed_aggregation_2b6e93dab9f249a094ac3bd274331f60/synthetic_auc_curve_agg.png", "../../logs/0-run/experiment_results/seed_aggregation_2b6e93dab9f249a094ac3bd274331f60/synthetic_loss_curve_agg.png"]], "plot_paths": [[], ["experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_56e15adc42294ddab0e8a5292281f6d3_proc_141122/synthetic_auc_curve.png", "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_56e15adc42294ddab0e8a5292281f6d3_proc_141122/synthetic_loss_curve.png"], ["experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_fbb9e2bbad4e4649897bd7c1231d63a8_proc_141123/synthetic_auc_curve.png", "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_fbb9e2bbad4e4649897bd7c1231d63a8_proc_141123/divergence_histogram.png", "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_fbb9e2bbad4e4649897bd7c1231d63a8_proc_141123/synthetic_divergence_histogram.png", "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_fbb9e2bbad4e4649897bd7c1231d63a8_proc_141123/synthetic_loss_curve.png"], ["experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_7bc52d2190e34fa391c047ab21707aaa_proc_141122/synthetic_auc_curve.png", "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_7bc52d2190e34fa391c047ab21707aaa_proc_141122/synthetic_loss_curve.png"], ["experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_18b75d33e2ce4c69883e353cb19086ef_proc_141123/synthetic_auc_curve.png", "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_18b75d33e2ce4c69883e353cb19086ef_proc_141123/synthetic_loss_curve.png"], ["experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_14b0e680daca45ff9f46f66729ada947_proc_141120/synthetic_auc_curve.png", "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_14b0e680daca45ff9f46f66729ada947_proc_141120/synthetic_loss_curve.png"], ["experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/seed_aggregation_2b6e93dab9f249a094ac3bd274331f60/synthetic_auc_curve_agg.png", "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/seed_aggregation_2b6e93dab9f249a094ac3bd274331f60/synthetic_loss_curve_agg.png"]], "plot_analyses": [[], [{"analysis": "Rapid increase in training AUC from around 0.72 to approximately 0.95 by epoch 3, followed by a stable plateau through epoch 20. Validation AUC remains consistently high (~0.955) across all epochs, with only a slight margin above the training curve. This close alignment and high absolute performance indicate strong generalization and no sign of overfitting on the synthetic dataset. The early saturation suggests the model reaches capacity quickly; introducing harder examples or more diverse paraphrases could further probe its uncertainty quantification capabilities.", "plot_path": "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_56e15adc42294ddab0e8a5292281f6d3_proc_141122/synthetic_auc_curve.png"}, {"analysis": "Both training and validation losses drop steadily from about 0.70/0.65 at epoch 1 to roughly 0.26/0.29 by epoch 20. The curves remain closely matched, with validation loss slightly higher but without divergence, reinforcing the observation of good generalization. The loss reduction slows after epoch 10, indicating diminishing returns; an early stopping point around epoch 15 might optimize computation without sacrificing performance.", "plot_path": "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_56e15adc42294ddab0e8a5292281f6d3_proc_141122/synthetic_loss_curve.png"}], [{"analysis": "Training and validation AUC over epochs reveal a steady improvement in both metrics. Training AUC climbs from ~0.515 at epoch 1 to ~0.575 by epoch 10, while validation AUC rises from ~0.520 to a peak of ~0.603 at epoch 9 before dipping to ~0.507 at epoch 10. The validation curve exhibits more volatility (notable dips at epochs 4, 5, and 7) but largely tracks the training curve with only a small gap (~2\u20133%), suggesting modest overfitting and good generalization throughout most of training.", "plot_path": "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_fbb9e2bbad4e4649897bd7c1231d63a8_proc_141123/synthetic_auc_curve.png"}, {"analysis": "The divergence (uncertainty) histogram on the validation set shows that correct predictions overwhelmingly cluster at very low divergence (near 0.0), whereas incorrect predictions\u2014though many also lie in that low\u2010divergence zone\u2014display a pronounced tail stretching into higher divergence values (~0.15\u20130.40). This indicates that high-divergence cases are strongly associated with errors, validating the basic utility of output divergence as a hallucination signal, even if some errors produce low divergence.", "plot_path": "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_fbb9e2bbad4e4649897bd7c1231d63a8_proc_141123/divergence_histogram.png"}, {"analysis": "When isolating the synthetic dataset, the divergence distribution mirrors the validation behavior: correct responses nearly all fall into the lowest uncertainty bin, and incorrect responses share that bin but extend into a secondary high\u2010divergence bin around 0.20. This clear tail for incorrect examples reinforces the idea that setting a divergence threshold can effectively flag a subset of erroneous outputs, although many incorrect answers remain in the low\u2010divergence region.", "plot_path": "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_fbb9e2bbad4e4649897bd7c1231d63a8_proc_141123/synthetic_divergence_histogram.png"}, {"analysis": "Training and validation loss curves both decrease smoothly from epoch 1 to epoch 10 (training loss from ~0.80 to ~0.20; validation loss from ~0.60 to ~0.23). The validation loss stays slightly above the training loss at every epoch, and both curves level off after epoch 7\u20138. This pattern indicates stable convergence without dramatic overfitting; the plateau aligns with the point of diminishing gains in AUC.", "plot_path": "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_fbb9e2bbad4e4649897bd7c1231d63a8_proc_141123/synthetic_loss_curve.png"}], [{"analysis": "Training AUC rises sharply in the first few epochs, peaking around 0.964, but remains consistently below the validation AUC, which is flat at ~0.972. This inversion\u2014validation performance exceeding training\u2014suggests that training-mode measurements may include active regularization (e.g. dropout) or noise injection, artificially depressing the training score. Alternatively, the training set may be slightly harder or more varied than the validation split, or there may be a data-ordering or metric-computation inconsistency. Ideally training and validation AUC curves should be computed under the same evaluation protocol; once aligned, we can verify whether the model is over- or under-fitting. Overall, the model achieves strong discrimination (AUC >0.94) on both splits after the third epoch with only modest further gains thereafter.", "plot_path": "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_7bc52d2190e34fa391c047ab21707aaa_proc_141122/synthetic_auc_curve.png"}, {"analysis": "Both training loss and validation loss start around 0.68 (training) vs 0.60 (validation) and decrease smoothly to ~0.25 (training) vs ~0.23 (validation) by epoch 20. The persistent gap\u2014validation loss lower than training\u2014mirrors the AUC inversion and again points to differences in evaluation mode or regularization being active on training but not validation. Loss curves display no signs of divergence or overfitting; instead, the model continues to make stable improvements late into training. If the true objective is better training fit, consider reducing dropout/regularization or increasing model capacity. If the goal is generalization, these results are already promising.", "plot_path": "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_7bc52d2190e34fa391c047ab21707aaa_proc_141122/synthetic_loss_curve.png"}], [{"analysis": "Training AUC fluctuates in a narrow band around 0.963, while validation AUC is essentially flat at ~0.9624. The small and stable gap (~0.0006) indicates the model generalizes well to held-out data without clear signs of overfitting. Minor up-and-down swings in training AUC (especially the dip near epoch 19) suggest some noise but no systematic degradation over time.", "plot_path": "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_18b75d33e2ce4c69883e353cb19086ef_proc_141123/synthetic_auc_curve.png"}, {"analysis": "Training loss steadily decreases from ~0.47 down to ~0.23 over 20 epochs, with validation loss mirroring that trend from ~0.45 down to ~0.245. The consistent gap\u2014training loss slightly below validation loss\u2014remains roughly constant, reinforcing that the model is neither underfitting nor overfitting. A small bump in training loss around epoch 17 hints at momentary variance, but convergence continues afterwards.", "plot_path": "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_18b75d33e2ce4c69883e353cb19086ef_proc_141123/synthetic_loss_curve.png"}], [{"analysis": "AUC on synthetic data remains high (validation ~0.972 constant), while training AUC oscillates around 0.956\u20130.960 with a slight downward drift by epoch 20. The lack of divergence or overfitting gap shrinking over time suggests the model quickly learns the synthetic distribution and doesn\u2019t overfit further. However, the lower and variable training AUC compared to a flat, higher validation AUC hints at possible data simplicity or leakage in the validation split, or that the synthetic task may not be challenging enough to reveal true learning dynamics.", "plot_path": "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_14b0e680daca45ff9f46f66729ada947_proc_141120/synthetic_auc_curve.png"}, {"analysis": "Training and validation loss both decrease smoothly from initial values (train ~0.56, val ~0.50) down to ~0.25 and ~0.20 respectively by epoch 20. Validation loss consistently undercuts the training loss, which is counterintuitive and may point to differences in data distribution or label noise in the training set. The steady convergence and lack of divergence indicate no overfitting; instead, the model\u2019s capacity might be underutilized on this synthetic dataset, as evidenced by loss plateauing without performance dips.", "plot_path": "experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_14b0e680daca45ff9f46f66729ada947_proc_141120/synthetic_loss_curve.png"}], []], "vlm_feedback_summary": ["[]", "Model demonstrates high AUC and low loss with minimal gap between training and\nvalidation metrics, confirming robust performance and limited overfitting.\nHowever, performance plateaus early, suggesting the need for more challenging or\nvaried prompt perturbations to fully evaluate uncertainty quantification.", "Loss and AUC curves confirm healthy model convergence with minimal overfitting,\npeaking in validation performance around epoch 9. Divergence\u2010based uncertainty\nseparates high\u2010error cases via a long tail in the incorrect distribution,\nsupporting the PIU hypothesis on this simple dataset. However, because many\nerrors still occur at low divergence, combining PIU with complementary\nuncertainty signals or richer perturbations may boost recall of hallucination\ndetection.", "Both curves indicate unusually higher validation metrics than training, likely\ndue to dropout or regularization active only during training-mode evaluation.\nAligning the evaluation procedure will clarify whether the model underfits or\ngeneralizes exceptionally well. Loss and AUC stabilize without overfitting,\nsuggesting the current capacity is adequate but could be further tuned if a\ntighter fit on training is desired.", "AUC is stable and validation performance closely follows training, suggesting\ngood generalization on synthetic data. Loss curves confirm steady convergence\nand no strong signs of divergence or overfitting.", "Plots show stable, high validation AUC and smoothly decreasing losses without\noverfitting. The synthetic dataset appears too easy or may have leakage, leading\nto validation metrics outperforming training. Next steps: introduce more\nchallenging, real-world data splits, verify data integrity, and possibly\nincrease model capacity to probe learning dynamics further.", "[]"], "exec_time": [19.271101236343384, 2.6422998905181885, 2.756155252456665, 2.9292259216308594, 2.7885518074035645, 2.850639820098877, null], "exec_time_feedback": ["", "", "", "", "", "", ""], "datasets_successfully_tested": [[], ["['synthetic']"], ["['synthetic']"], ["[synthetic]"], ["['synthetic']"], [""], []], "plot_code": [null, "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\ntry:\n    data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\nelse:\n    key = \"synthetic\"\n    losses = data[key][\"losses\"]\n    metrics = data[key][\"metrics\"]\n    epochs = list(range(1, len(losses[\"train\"]) + 1))\n    print(\n        f\"Final Train Loss: {losses['train'][-1]:.4f}, Final Val Loss: {losses['val'][-1]:.4f}\"\n    )\n    print(\n        f\"Final Train AUC: {metrics['train'][-1]:.4f}, Final Val AUC: {metrics['val'][-1]:.4f}\"\n    )\n\n    try:\n        plt.figure()\n        plt.plot(epochs, losses[\"train\"], label=\"Train Loss\")\n        plt.plot(epochs, losses[\"val\"], label=\"Val Loss\")\n        plt.title(\"Loss Curve\\nTraining vs Validation Loss on synthetic dataset\")\n        plt.xlabel(\"Epoch\")\n        plt.ylabel(\"Loss\")\n        plt.legend()\n        plt.savefig(os.path.join(working_dir, \"synthetic_loss_curve.png\"))\n        plt.close()\n    except Exception as e:\n        print(f\"Error creating loss curve: {e}\")\n        plt.close()\n\n    try:\n        plt.figure()\n        plt.plot(epochs, metrics[\"train\"], label=\"Train AUC\")\n        plt.plot(epochs, metrics[\"val\"], label=\"Val AUC\")\n        plt.title(\"AUC Curve\\nTraining vs Validation AUC on synthetic dataset\")\n        plt.xlabel(\"Epoch\")\n        plt.ylabel(\"AUC\")\n        plt.legend()\n        plt.savefig(os.path.join(working_dir, \"synthetic_auc_curve.png\"))\n        plt.close()\n    except Exception as e:\n        print(f\"Error creating AUC curve: {e}\")\n        plt.close()\n", "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n# Load experiment data\ntry:\n    exp = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\n    data = exp[\"synthetic\"]\n    loss_train = data[\"losses\"][\"train\"]\n    loss_val = data[\"losses\"][\"val\"]\n    auc_train = data[\"metrics\"][\"train\"]\n    auc_val = data[\"metrics\"][\"val\"]\n    divergences = np.array(data[\"predictions\"])\n    errors = np.array(data[\"ground_truth\"])\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n    loss_train, loss_val, auc_train, auc_val, divergences, errors = (\n        [],\n        [],\n        [],\n        [],\n        np.array([]),\n        np.array([]),\n    )\n\n# Plot training vs validation loss\ntry:\n    plt.figure()\n    epochs = np.arange(1, len(loss_train) + 1)\n    plt.plot(epochs, loss_train, label=\"Train Loss\")\n    plt.plot(epochs, loss_val, label=\"Val Loss\")\n    plt.title(\n        \"Synthetic Dataset: Training and Validation Loss\\nLeft: Train, Right: Val\"\n    )\n    plt.xlabel(\"Epoch\")\n    plt.ylabel(\"Loss\")\n    plt.legend()\n    fname = os.path.join(working_dir, \"synthetic_loss_curve.png\")\n    plt.savefig(fname)\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating loss curve plot: {e}\")\n    plt.close()\n\n# Plot training vs validation AUC\ntry:\n    plt.figure()\n    epochs = np.arange(1, len(auc_train) + 1)\n    plt.plot(epochs, auc_train, label=\"Train AUC\")\n    plt.plot(epochs, auc_val, label=\"Val AUC\")\n    plt.title(\"Synthetic Dataset: Training and Validation AUC\\nLeft: Train, Right: Val\")\n    plt.xlabel(\"Epoch\")\n    plt.ylabel(\"AUC-ROC\")\n    plt.legend()\n    fname = os.path.join(working_dir, \"synthetic_auc_curve.png\")\n    plt.savefig(fname)\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating AUC curve plot: {e}\")\n    plt.close()\n\n# Plot histogram of divergences for correct vs incorrect\ntry:\n    plt.figure()\n    plt.hist(divergences[errors == 0], bins=20, alpha=0.6, label=\"Correct\")\n    plt.hist(divergences[errors == 1], bins=20, alpha=0.6, label=\"Incorrect\")\n    plt.title(\n        \"Synthetic Dataset: Divergence Distribution\\nLeft: Correct, Right: Incorrect\"\n    )\n    plt.xlabel(\"Uncertainty Score (Divergence)\")\n    plt.ylabel(\"Count\")\n    plt.legend()\n    fname = os.path.join(working_dir, \"synthetic_divergence_histogram.png\")\n    plt.savefig(fname)\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating divergence histogram plot: {e}\")\n    plt.close()\n", "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\ntry:\n    data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\nelse:\n    key = \"synthetic\"\n    losses = data[key][\"losses\"]\n    metrics = data[key][\"metrics\"]\n    epochs = list(range(1, len(losses[\"train\"]) + 1))\n    print(\n        f\"Final Train Loss: {losses['train'][-1]:.4f}, Final Val Loss: {losses['val'][-1]:.4f}\"\n    )\n    print(\n        f\"Final Train AUC: {metrics['train'][-1]:.4f}, Final Val AUC: {metrics['val'][-1]:.4f}\"\n    )\n\n    try:\n        plt.figure()\n        plt.plot(epochs, losses[\"train\"], label=\"Train Loss\")\n        plt.plot(epochs, losses[\"val\"], label=\"Val Loss\")\n        plt.title(\"Loss Curve\\nTraining vs Validation Loss on synthetic dataset\")\n        plt.xlabel(\"Epoch\")\n        plt.ylabel(\"Loss\")\n        plt.legend()\n        plt.savefig(os.path.join(working_dir, \"synthetic_loss_curve.png\"))\n        plt.close()\n    except Exception as e:\n        print(f\"Error creating loss curve: {e}\")\n        plt.close()\n\n    try:\n        plt.figure()\n        plt.plot(epochs, metrics[\"train\"], label=\"Train AUC\")\n        plt.plot(epochs, metrics[\"val\"], label=\"Val AUC\")\n        plt.title(\"AUC Curve\\nTraining vs Validation AUC on synthetic dataset\")\n        plt.xlabel(\"Epoch\")\n        plt.ylabel(\"AUC\")\n        plt.legend()\n        plt.savefig(os.path.join(working_dir, \"synthetic_auc_curve.png\"))\n        plt.close()\n    except Exception as e:\n        print(f\"Error creating AUC curve: {e}\")\n        plt.close()\n", "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\ntry:\n    data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\nelse:\n    key = \"synthetic\"\n    losses = data[key][\"losses\"]\n    metrics = data[key][\"metrics\"]\n    epochs = list(range(1, len(losses[\"train\"]) + 1))\n    print(\n        f\"Final Train Loss: {losses['train'][-1]:.4f}, Final Val Loss: {losses['val'][-1]:.4f}\"\n    )\n    print(\n        f\"Final Train AUC: {metrics['train'][-1]:.4f}, Final Val AUC: {metrics['val'][-1]:.4f}\"\n    )\n\n    try:\n        plt.figure()\n        plt.plot(epochs, losses[\"train\"], label=\"Train Loss\")\n        plt.plot(epochs, losses[\"val\"], label=\"Val Loss\")\n        plt.title(\"Loss Curve\\nTraining vs Validation Loss on synthetic dataset\")\n        plt.xlabel(\"Epoch\")\n        plt.ylabel(\"Loss\")\n        plt.legend()\n        plt.savefig(os.path.join(working_dir, \"synthetic_loss_curve.png\"))\n        plt.close()\n    except Exception as e:\n        print(f\"Error creating loss curve: {e}\")\n        plt.close()\n\n    try:\n        plt.figure()\n        plt.plot(epochs, metrics[\"train\"], label=\"Train AUC\")\n        plt.plot(epochs, metrics[\"val\"], label=\"Val AUC\")\n        plt.title(\"AUC Curve\\nTraining vs Validation AUC on synthetic dataset\")\n        plt.xlabel(\"Epoch\")\n        plt.ylabel(\"AUC\")\n        plt.legend()\n        plt.savefig(os.path.join(working_dir, \"synthetic_auc_curve.png\"))\n        plt.close()\n    except Exception as e:\n        print(f\"Error creating AUC curve: {e}\")\n        plt.close()\n", "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\ntry:\n    data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\nelse:\n    key = \"synthetic\"\n    losses = data[key][\"losses\"]\n    metrics = data[key][\"metrics\"]\n    epochs = list(range(1, len(losses[\"train\"]) + 1))\n    print(\n        f\"Final Train Loss: {losses['train'][-1]:.4f}, Final Val Loss: {losses['val'][-1]:.4f}\"\n    )\n    print(\n        f\"Final Train AUC: {metrics['train'][-1]:.4f}, Final Val AUC: {metrics['val'][-1]:.4f}\"\n    )\n\n    try:\n        plt.figure()\n        plt.plot(epochs, losses[\"train\"], label=\"Train Loss\")\n        plt.plot(epochs, losses[\"val\"], label=\"Val Loss\")\n        plt.title(\"Loss Curve\\nTraining vs Validation Loss on synthetic dataset\")\n        plt.xlabel(\"Epoch\")\n        plt.ylabel(\"Loss\")\n        plt.legend()\n        plt.savefig(os.path.join(working_dir, \"synthetic_loss_curve.png\"))\n        plt.close()\n    except Exception as e:\n        print(f\"Error creating loss curve: {e}\")\n        plt.close()\n\n    try:\n        plt.figure()\n        plt.plot(epochs, metrics[\"train\"], label=\"Train AUC\")\n        plt.plot(epochs, metrics[\"val\"], label=\"Val AUC\")\n        plt.title(\"AUC Curve\\nTraining vs Validation AUC on synthetic dataset\")\n        plt.xlabel(\"Epoch\")\n        plt.ylabel(\"AUC\")\n        plt.legend()\n        plt.savefig(os.path.join(working_dir, \"synthetic_auc_curve.png\"))\n        plt.close()\n    except Exception as e:\n        print(f\"Error creating AUC curve: {e}\")\n        plt.close()\n", "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\n\ntry:\n    experiment_data_path_list = [\n        \"experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_7bc52d2190e34fa391c047ab21707aaa_proc_141122/experiment_data.npy\",\n        \"experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_18b75d33e2ce4c69883e353cb19086ef_proc_141123/experiment_data.npy\",\n        \"experiments/2025-06-07_22-20-29_perturbation_ensemble_uq_attempt_0/logs/0-run/experiment_results/experiment_14b0e680daca45ff9f46f66729ada947_proc_141120/experiment_data.npy\",\n    ]\n    all_experiment_data = []\n    for experiment_data_path in experiment_data_path_list:\n        exp = np.load(\n            os.path.join(os.getenv(\"AI_SCIENTIST_ROOT\"), experiment_data_path),\n            allow_pickle=True,\n        ).item()\n        all_experiment_data.append(exp)\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\nelse:\n    for key in all_experiment_data[0]:\n        dataset_info = all_experiment_data[0][key]\n        if \"losses\" not in dataset_info or \"metrics\" not in dataset_info:\n            continue\n\n        train_losses_runs = [\n            np.array(run[key][\"losses\"][\"train\"]) for run in all_experiment_data\n        ]\n        val_losses_runs = [\n            np.array(run[key][\"losses\"][\"val\"]) for run in all_experiment_data\n        ]\n        train_auc_runs = [\n            np.array(run[key][\"metrics\"][\"train\"]) for run in all_experiment_data\n        ]\n        val_auc_runs = [\n            np.array(run[key][\"metrics\"][\"val\"]) for run in all_experiment_data\n        ]\n\n        train_losses_arr = np.vstack(train_losses_runs)\n        val_losses_arr = np.vstack(val_losses_runs)\n        train_auc_arr = np.vstack(train_auc_runs)\n        val_auc_arr = np.vstack(val_auc_runs)\n\n        n_runs, n_epochs = train_losses_arr.shape\n        epochs = np.arange(1, n_epochs + 1)\n\n        mean_train_losses = train_losses_arr.mean(axis=0)\n        se_train_losses = train_losses_arr.std(axis=0, ddof=1) / np.sqrt(n_runs)\n        mean_val_losses = val_losses_arr.mean(axis=0)\n        se_val_losses = val_losses_arr.std(axis=0, ddof=1) / np.sqrt(n_runs)\n        mean_train_auc = train_auc_arr.mean(axis=0)\n        se_train_auc = train_auc_arr.std(axis=0, ddof=1) / np.sqrt(n_runs)\n        mean_val_auc = val_auc_arr.mean(axis=0)\n        se_val_auc = val_auc_arr.std(axis=0, ddof=1) / np.sqrt(n_runs)\n\n        print(\n            f\"{key} dataset - Final Train Loss: {mean_train_losses[-1]:.4f} \u00b1 {se_train_losses[-1]:.4f}, Final Val Loss: {mean_val_losses[-1]:.4f} \u00b1 {se_val_losses[-1]:.4f}\"\n        )\n        print(\n            f\"{key} dataset - Final Train AUC: {mean_train_auc[-1]:.4f} \u00b1 {se_train_auc[-1]:.4f}, Final Val AUC: {mean_val_auc[-1]:.4f} \u00b1 {se_val_auc[-1]:.4f}\"\n        )\n\n        try:\n            plt.figure()\n            plt.errorbar(\n                epochs,\n                mean_train_losses,\n                yerr=se_train_losses,\n                label=\"Train Loss Mean \u00b1 SE\",\n            )\n            plt.errorbar(\n                epochs, mean_val_losses, yerr=se_val_losses, label=\"Val Loss Mean \u00b1 SE\"\n            )\n            plt.title(f\"Loss Curve\\nMean \u00b1 SE across runs on {key} dataset\")\n            plt.xlabel(\"Epoch\")\n            plt.ylabel(\"Loss\")\n            plt.legend()\n            plt.savefig(os.path.join(working_dir, f\"{key}_loss_curve_agg.png\"))\n            plt.close()\n        except Exception as e:\n            print(f\"Error creating aggregated loss curve for {key}: {e}\")\n            plt.close()\n\n        try:\n            plt.figure()\n            plt.errorbar(\n                epochs, mean_train_auc, yerr=se_train_auc, label=\"Train AUC Mean \u00b1 SE\"\n            )\n            plt.errorbar(\n                epochs, mean_val_auc, yerr=se_val_auc, label=\"Val AUC Mean \u00b1 SE\"\n            )\n            plt.title(f\"AUC Curve\\nMean \u00b1 SE across runs on {key} dataset\")\n            plt.xlabel(\"Epoch\")\n            plt.ylabel(\"AUC\")\n            plt.legend()\n            plt.savefig(os.path.join(working_dir, f\"{key}_auc_curve_agg.png\"))\n            plt.close()\n        except Exception as e:\n            print(f\"Error creating aggregated AUC curve for {key}: {e}\")\n            plt.close()\n"], "plot_plan": [null, "We load the saved experiment data and extract the synthetic dataset\u2019s losses and AUCs over epochs. After determining the number of epochs, we print out the final train/validation loss and AUC for quick reference. We then create two separate plots\u2014loss curves and AUC curves\u2014each wrapped in its own try-except block. Each plot uses a two-line title to clearly specify \u201cTraining vs Validation\u201d on the synthetic dataset, labels axes, and includes a legend. We save each figure under a descriptive filename in the working directory, and close the figure in all cases to free resources.", "We load the saved experiment data from the working directory and extract per-epoch train/val losses and AUCs, as well as sample-level divergences and error flags for the synthetic dataset.  We then generate three separate visualizations: (1) a curve of training vs validation loss across epochs; (2) a curve of training vs validation AUC across epochs; and (3) a histogram overlay of divergence scores for correctly and incorrectly predicted validation samples.  Each plotting step is enclosed in its own try-except block to gracefully handle errors, and all figures are closed after saving.  Titles explicitly mention the \u201cSynthetic\u201d dataset and include clear subtitles such as \u201cLeft: Train, Right: Val\u201d or \u201cLeft: Correct, Right: Incorrect.\u201d  Plot files are named descriptively (e.g., synthetic_loss_curve.png) and saved into the working directory.", null, null, null, null], "ablation_name": [null, null, null, null, null, null, null], "hyperparam_name": [null, null, null, null, null, null, null], "is_seed_node": [false, false, false, true, true, true, true], "is_seed_agg_node": [false, false, false, false, false, false, true], "parse_metrics_plan": ["Here\u2019s a simple script that loads the saved experiment data, iterates over each\ndataset, and prints out the dataset name followed by the final training loss,\nfinal validation loss, and final validation Hallucination Detection AUC-ROC. It\nhandles missing entries gracefully.", "The script below loads the saved `experiment_data.npy` file from the `working`\ndirectory, iterates over each dataset inside, and prints the dataset name\nfollowed by the final training and validation AUC as well as the final training\nand validation losses, all with clear, descriptive labels.", "The script loads the experiment_data.npy file from the 'working' directory\nrelative to the current working directory. It then iterates over each dataset in\nthe loaded dictionary and prints the dataset name followed by its final training\nloss, final validation loss, final training detection AUC-ROC, and final\nvalidation detection AUC-ROC with clear labels. All code runs at the global\nscope and executes immediately without requiring any special entry point.", "The script below loads the saved `experiment_data.npy` file from the `working`\ndirectory, iterates over each dataset inside, and prints the dataset name\nfollowed by the final training and validation AUC as well as the final training\nand validation losses, all with clear, descriptive labels.", "The script below loads the saved `experiment_data.npy` file from the `working`\ndirectory, iterates over each dataset inside, and prints the dataset name\nfollowed by the final training and validation AUC as well as the final training\nand validation losses, all with clear, descriptive labels.", "The script below loads the saved `experiment_data.npy` file from the `working`\ndirectory, iterates over each dataset inside, and prints the dataset name\nfollowed by the final training and validation AUC as well as the final training\nand validation losses, all with clear, descriptive labels.", ""], "parse_metrics_code": ["import os\nimport numpy as np\n\n# Load experiment data from the working directory\nworking_dir = os.path.join(os.getcwd(), \"working\")\nfile_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(file_path, allow_pickle=True).item()\n\n# Iterate through each dataset and print the final metrics\nfor dataset_name, results in experiment_data.items():\n    print(f\"Dataset: {dataset_name}\")\n\n    # Extract and print losses\n    train_losses = results.get(\"losses\", {}).get(\"train\", [])\n    val_losses = results.get(\"losses\", {}).get(\"val\", [])\n    if train_losses:\n        print(f\"Final training loss: {train_losses[-1]:.4f}\")\n    if val_losses:\n        print(f\"Final validation loss: {val_losses[-1]:.4f}\")\n\n    # Extract and print Hallucination Detection AUC-ROC\n    train_auc = results.get(\"metrics\", {}).get(\"train\", [])\n    val_auc = results.get(\"metrics\", {}).get(\"val\", [])\n    if train_auc:\n        print(f\"Final training Hallucination Detection AUC-ROC: {train_auc[-1]:.4f}\")\n    if val_auc:\n        print(f\"Final validation Hallucination Detection AUC-ROC: {val_auc[-1]:.4f}\")\n", "import os\nimport numpy as np\n\n# Locate the working directory and load the experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\nexperiment_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(experiment_path, allow_pickle=True).item()\n\n# Iterate over each dataset and print final metrics\nfor dataset_name, data in experiment_data.items():\n    print(f\"Dataset: {dataset_name}\")\n\n    # Extract final metrics\n    final_train_auc = data[\"metrics\"][\"train\"][-1]\n    final_validation_auc = data[\"metrics\"][\"val\"][-1]\n    final_train_loss = data[\"losses\"][\"train\"][-1]\n    final_validation_loss = data[\"losses\"][\"val\"][-1]\n\n    # Print metrics with descriptive labels\n    print(f\"Final training AUC: {final_train_auc:.4f}\")\n    print(f\"Final validation AUC: {final_validation_auc:.4f}\")\n    print(f\"Final training loss: {final_train_loss:.4f}\")\n    print(f\"Final validation loss: {final_validation_loss:.4f}\")\n    print()  # Blank line between datasets\n", "import os\nimport numpy as np\n\n# Load the experiment data\ndata_path = os.path.join(os.getcwd(), \"working\", \"experiment_data.npy\")\nexperiment_data = np.load(data_path, allow_pickle=True).item()\n\n# Iterate through each dataset and print the final metrics\nfor dataset_name, dataset_info in experiment_data.items():\n    print(f\"{dataset_name} dataset:\")\n\n    # Losses\n    train_losses = dataset_info.get(\"losses\", {}).get(\"train\", [])\n    val_losses = dataset_info.get(\"losses\", {}).get(\"val\", [])\n    if train_losses:\n        print(f\"  Training loss: {train_losses[-1]:.4f}\")\n    if val_losses:\n        print(f\"  Validation loss: {val_losses[-1]:.4f}\")\n\n    # Detection AUC metrics\n    train_aucs = dataset_info.get(\"metrics\", {}).get(\"train\", [])\n    val_aucs = dataset_info.get(\"metrics\", {}).get(\"val\", [])\n    if train_aucs:\n        print(f\"  Training detection AUC-ROC: {train_aucs[-1]:.4f}\")\n    if val_aucs:\n        print(f\"  Validation detection AUC-ROC: {val_aucs[-1]:.4f}\")\n", "import os\nimport numpy as np\n\n# Locate the working directory and load the experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\nexperiment_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(experiment_path, allow_pickle=True).item()\n\n# Iterate over each dataset and print final metrics\nfor dataset_name, data in experiment_data.items():\n    print(f\"Dataset: {dataset_name}\")\n\n    # Extract final metrics\n    final_train_auc = data[\"metrics\"][\"train\"][-1]\n    final_validation_auc = data[\"metrics\"][\"val\"][-1]\n    final_train_loss = data[\"losses\"][\"train\"][-1]\n    final_validation_loss = data[\"losses\"][\"val\"][-1]\n\n    # Print metrics with descriptive labels\n    print(f\"Final training AUC: {final_train_auc:.4f}\")\n    print(f\"Final validation AUC: {final_validation_auc:.4f}\")\n    print(f\"Final training loss: {final_train_loss:.4f}\")\n    print(f\"Final validation loss: {final_validation_loss:.4f}\")\n    print()  # Blank line between datasets\n", "import os\nimport numpy as np\n\n# Locate the working directory and load the experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\nexperiment_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(experiment_path, allow_pickle=True).item()\n\n# Iterate over each dataset and print final metrics\nfor dataset_name, data in experiment_data.items():\n    print(f\"Dataset: {dataset_name}\")\n\n    # Extract final metrics\n    final_train_auc = data[\"metrics\"][\"train\"][-1]\n    final_validation_auc = data[\"metrics\"][\"val\"][-1]\n    final_train_loss = data[\"losses\"][\"train\"][-1]\n    final_validation_loss = data[\"losses\"][\"val\"][-1]\n\n    # Print metrics with descriptive labels\n    print(f\"Final training AUC: {final_train_auc:.4f}\")\n    print(f\"Final validation AUC: {final_validation_auc:.4f}\")\n    print(f\"Final training loss: {final_train_loss:.4f}\")\n    print(f\"Final validation loss: {final_validation_loss:.4f}\")\n    print()  # Blank line between datasets\n", "import os\nimport numpy as np\n\n# Locate the working directory and load the experiment data\nworking_dir = os.path.join(os.getcwd(), \"working\")\nexperiment_path = os.path.join(working_dir, \"experiment_data.npy\")\nexperiment_data = np.load(experiment_path, allow_pickle=True).item()\n\n# Iterate over each dataset and print final metrics\nfor dataset_name, data in experiment_data.items():\n    print(f\"Dataset: {dataset_name}\")\n\n    # Extract final metrics\n    final_train_auc = data[\"metrics\"][\"train\"][-1]\n    final_validation_auc = data[\"metrics\"][\"val\"][-1]\n    final_train_loss = data[\"losses\"][\"train\"][-1]\n    final_validation_loss = data[\"losses\"][\"val\"][-1]\n\n    # Print metrics with descriptive labels\n    print(f\"Final training AUC: {final_train_auc:.4f}\")\n    print(f\"Final validation AUC: {final_validation_auc:.4f}\")\n    print(f\"Final training loss: {final_train_loss:.4f}\")\n    print(f\"Final validation loss: {final_validation_loss:.4f}\")\n    print()  # Blank line between datasets\n", ""], "parse_term_out": ["['Dataset: synthetic_sentiment', '\\n', 'Final training loss: 0.0006', '\\n',\n'Final validation loss: 0.0003', '\\n', 'Final validation Hallucination Detection\nAUC-ROC: nan', '\\n', 'Execution time: a moment seconds (time limit is an\nhour).']", "['Dataset: synthetic', '\\n', 'Final training AUC: 0.9505', '\\n', 'Final\nvalidation AUC: 0.9572', '\\n', 'Final training loss: 0.2669', '\\n', 'Final\nvalidation loss: 0.2861', '\\n', '\\n', 'Execution time: a moment seconds (time\nlimit is an hour).']", "['synthetic dataset:', '\\n', '  Training loss: 0.2013', '\\n', '  Validation\nloss: 0.2318', '\\n', '  Training detection AUC-ROC: 0.5744', '\\n', '  Validation\ndetection AUC-ROC: 0.5083', '\\n', 'Execution time: a moment seconds (time limit\nis an hour).']", "['Dataset: synthetic', '\\n', 'Final training AUC: 0.9639', '\\n', 'Final\nvalidation AUC: 0.9718', '\\n', 'Final training loss: 0.2418', '\\n', 'Final\nvalidation loss: 0.2303', '\\n', '\\n', 'Execution time: a moment seconds (time\nlimit is an hour).']", "['Dataset: synthetic', '\\n', 'Final training AUC: 0.9637', '\\n', 'Final\nvalidation AUC: 0.9624', '\\n', 'Final training loss: 0.2328', '\\n', 'Final\nvalidation loss: 0.2439', '\\n', '\\n', 'Execution time: a moment seconds (time\nlimit is an hour).']", "['Dataset: synthetic', '\\n', 'Final training AUC: 0.9545', '\\n', 'Final\nvalidation AUC: 0.9717', '\\n', 'Final training loss: 0.2462', '\\n', 'Final\nvalidation loss: 0.1967', '\\n', '\\n', 'Execution time: a moment seconds (time\nlimit is an hour).']", ""], "parse_exc_type": [null, null, null, null, null, null, null], "parse_exc_info": [null, null, null, null, null, null, null], "parse_exc_stack": [null, null, null, null, null, null, null], "completed_stages": ["Stage_1"]};
+
+// Add log directory path and stage info to the tree data
+treeStructData.log_dir_path = window.location.pathname.split('/').slice(0, -1).join('/');
+treeStructData.current_stage = window.location.pathname.includes('stage_')
+  ? window.location.pathname.split('stage_')[1].split('/')[0]
+  : 'Stage_1';
+
+// Initialize background color
+window.bgColCurrent = bgCol;
+
+// Function to set background color that can be called from the console
+function setBackgroundColor(color) {
+  // Update the global color
+  updateBackgroundColor(color);
+
+  // Refresh the current sketch to apply the new background color
+  if (currentStage) {
+    startSketch(currentStage);
+  }
+}
+
+// Load all stage data and initialize the visualization
+loadAllStageData(treeStructData);
+
+    </script>
+    <title>AI Scientist-v2 Visualization</title>
+    <style>
+      body,
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background-color: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+      #canvas-container {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 40vw;
+        height: 100vh;
+        background-color: inherit;
+        padding-top: 40px;
+      }
+      canvas {
+        float: left;
+        height: 100vh;
+        width: 100vw;
+      }
+      #text-container {
+        float: right;
+        height: 100vh;
+        width: 50vw;
+        background-color: #282c34;
+        overflow: auto;
+      }
+      #plan {
+        /* border-left: 2px solid #282c34; */
+        background-color: #282c34;
+        color: #f2f0e7;
+        min-height: 5rem;
+        padding: 1em 0 1em 1em;
+      }
+      #plot_plan {
+        background-color: #282c34;
+        color: #f2f0e7;
+        min-height: 5rem;
+        padding: 1em 0 1em 1em;
+        white-space: pre-wrap;
+      }
+      #exec_time_feedback {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #282c34;
+        border-left: 3px solid #ff5555;
+        color: #f2f0e7;
+      }
+      #exec_time {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #282c34;
+        border-left: 3px solid #ff5555;
+        color: #f2f0e7;
+      }
+      #exc_info {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #2c1f1f;
+        border-left: 3px solid #ff5555;
+        color: #f2f0e7;
+      }
+      #metrics {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #282c34;
+        color: #f2f0e7;
+      }
+      #vlm_feedback {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #1f2c2f;
+        color: #f2f0e7;
+        border-left: 3px solid #55ff55;
+      }
+      #vlm_feedback p {
+        margin: 0.5em 0;
+        white-space: pre-wrap;
+      }
+      .datasets_successfully_tested {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #282c34;
+        color: #f2f0e7;
+        border-left: 3px solid #55ff55;
+      }
+      .plots-container {
+        float: right;
+        width: 50vw;
+        padding: 1rem;
+        background-color: #282c34;
+        margin-top: 1rem;
+      }
+
+      .plot-item {
+        flex: 1 1 300px;
+        max-width: 100%;
+        margin-bottom: 1rem;
+        white-space: pre-wrap;
+      }
+
+      .plot-item img {
+        width: 100%;
+        height: auto;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: block;
+      }
+
+      .metric-group {
+        margin-bottom: 20px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .metric-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      .metric-table th,
+      .metric-table td {
+        padding: 8px;
+        text-align: left;
+        border: 1px solid #ddd;
+      }
+
+      .metric-table th {
+        background-color: #363b44;
+      }
+
+      /* Styles for tabs */
+      .tabs-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 49vw;
+        background-color: #000000;
+        z-index: 10;
+        display: flex;
+        padding: 0;
+      }
+
+      .tab {
+        cursor: pointer;
+        padding: 10px 15px;
+        background-color: #333;
+        color: #f2f0e7;
+        border: none;
+        outline: none;
+        transition: background-color 0.3s;
+        flex: 1;
+        text-align: center;
+      }
+
+      .tab:hover {
+        background-color: #444;
+      }
+
+      .tab.active {
+        background-color: #4c76af;
+        font-weight: bold;
+      }
+
+      .tab.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background-color: #282c34;
+      }
+
+      .tab-content {
+        display: none;
+        padding-top: 40px; /* Space for tabs */
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      .stage-info {
+        padding: 10px;
+        background-color: #282c34;
+        color: #f2f0e7;
+        margin-bottom: 10px;
+        font-size: 0.9em;
+      }
+
+      .stage-status {
+        display: inline-block;
+        padding: 3px 6px;
+        border-radius: 3px;
+        margin-left: 8px;
+        font-size: 0.8em;
+      }
+
+      .stage-status.completed {
+        background-color: #4caf50;
+      }
+
+      .stage-status.in-progress {
+        background-color: #2196f3;
+      }
+
+      .stage-status.not-started {
+        background-color: #9e9e9e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="tabs-container" id="stage-tabs">
+      <button class="tab" data-stage="Stage_1" onclick="selectStage('Stage_1')">Stage 1</button>
+      <button class="tab" data-stage="Stage_2" onclick="selectStage('Stage_2')">Stage 2</button>
+      <button class="tab" data-stage="Stage_3" onclick="selectStage('Stage_3')">Stage 3</button>
+      <button class="tab" data-stage="Stage_4" onclick="selectStage('Stage_4')">Stage 4</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <pre id="text-container">
+        <div id="stage-info" class="stage-info"></div>
+        <div id="plan"></div>
+        <hr>
+        <div id="exc_info"></div>
+        <hr>
+        <div id="exec_time"></div>
+        <hr>
+        <div id="exec_time_feedback"></div>
+        <hr>
+        <div id="metrics"></div>
+        <hr>
+        <div id="plot_plan"></div>
+        <hr>
+        <div class="plots-container" id="plots"></div>
+        <hr>
+        <div id="vlm_feedback"></div>
+        <hr>
+        <div id="datasets_successfully_tested"></div>
+        <hr>
+        <code id="code" class="language-python"></code>
+        <hr>
+        <code id="plot_code" class="language-python"></code>
+    </pre>
+  </body>
+</html>

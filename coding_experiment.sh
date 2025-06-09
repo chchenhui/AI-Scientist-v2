@@ -8,7 +8,7 @@ NUM_CITE_ROUNDS=20
 
 TASKS=(
     # your tasks here
-    "iclr2025_question"
+    "iclr2025_dl4c"
     # "iclr2025_scope"
     # "iclr2025_scsl"
     # "iclr2025_verifai"

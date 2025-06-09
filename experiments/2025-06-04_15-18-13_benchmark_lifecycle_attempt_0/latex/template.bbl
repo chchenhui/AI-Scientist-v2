@@ -1,0 +1,75 @@
+\begin{thebibliography}{10}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Goodfellow et~al.(2014)Goodfellow, Shlens, and
+  Szegedy]{goodfellow2014explainingah}
+I.~Goodfellow, Jonathon Shlens, and Christian Szegedy.
+\newblock Explaining and harnessing adversarial examples.
+\newblock abs/1412.6572, 2014.
+
+\bibitem[Gretton et~al.(2012)Gretton, Borgwardt, Rasch, Schölkopf, and
+  Smola]{gretton2012akt}
+A.~Gretton, Karsten~M. Borgwardt, M.~Rasch, B.~Schölkopf, and Alex Smola.
+\newblock A kernel two-sample test.
+\newblock 13:\penalty0 723--773, 2012.
+
+\bibitem[Gupta et~al.(2024)Gupta, Tian, Wang, and
+  Nahrstedt]{gupta2024twinadaptcl}
+Ragini Gupta, Beitong Tian, Yaohui Wang, and Klara Nahrstedt.
+\newblock Twin-adapt: Continuous learning for digital twin-enabled online
+  anomaly classification in iot-driven smart labs.
+\newblock \emph{Future Internet}, 16:\penalty0 239, 2024.
+
+\bibitem[Heusel et~al.(2017)Heusel, Ramsauer, Unterthiner, Nessler, and
+  Hochreiter]{heusel2017ganstb}
+M.~Heusel, Hubert Ramsauer, Thomas Unterthiner, Bernhard Nessler, and Sepp
+  Hochreiter.
+\newblock Gans trained by a two time-scale update rule converge to a local nash
+  equilibrium.
+\newblock pp.\  6626--6637, 2017.
+
+\bibitem[Karras et~al.(2019)Karras, Laine, Aittala, Hellsten, Lehtinen, and
+  Aila]{karras2019analyzingai}
+Tero Karras, S.~Laine, M.~Aittala, Janne Hellsten, J.~Lehtinen, and Timo Aila.
+\newblock Analyzing and improving the image quality of stylegan.
+\newblock pp.\  8107--8116, 2019.
+
+\bibitem[Lakshminarayanan et~al.(2016)Lakshminarayanan, Pritzel, and
+  Blundell]{lakshminarayanan2016simpleas}
+Balaji Lakshminarayanan, A.~Pritzel, and C.~Blundell.
+\newblock Simple and scalable predictive uncertainty estimation using deep
+  ensembles.
+\newblock pp.\  6402--6413, 2016.
+
+\bibitem[Radford et~al.(2019)Radford, Wu, Child, Luan, Amodei, and
+  Sutskever]{radford2019languagema}
+Alec Radford, Jeff Wu, R.~Child, D.~Luan, Dario Amodei, and I.~Sutskever.
+\newblock Language models are unsupervised multitask learners.
+\newblock 2019.
+
+\bibitem[Recht et~al.(2019)Recht, Roelofs, Schmidt, and Shankar]{recht2019doic}
+B.~Recht, R.~Roelofs, Ludwig Schmidt, and Vaishaal Shankar.
+\newblock Do imagenet classifiers generalize to imagenet?
+\newblock pp.\  5389--5400, 2019.
+
+\bibitem[Wang et~al.(2018)Wang, Singh, Michael, Hill, Levy, and
+  Bowman]{wang2018glueam}
+Alex Wang, Amanpreet Singh, Julian Michael, Felix Hill, Omer Levy, and
+  Samuel~R. Bowman.
+\newblock {GLUE}: A multi-task benchmark and analysis platform for natural
+  language understanding.
+\newblock pp.\  353--355, 2018.
+
+\bibitem[Wang et~al.(2019)Wang, Pruksachatkun, Nangia, Singh, Michael, Hill,
+  Levy, and Bowman]{wang2019superglueas}
+Alex Wang, Yada Pruksachatkun, Nikita Nangia, Amanpreet Singh, Julian Michael,
+  Felix Hill, Omer Levy, and Samuel~R. Bowman.
+\newblock Superglue: A stickier benchmark for general-purpose language
+  understanding systems.
+\newblock 2019.
+
+\end{thebibliography}
